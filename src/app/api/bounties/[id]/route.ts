@@ -63,18 +63,18 @@ async function getBountyOr404(id: string) {
   return data as BountyRow;
 }
 
-export async function GET(_: NextRequest, { params }: { params: { id: string } }) {
-  try {
-    const bounty = await getBountyOr404(params.id);
-    if (!bounty) {
-      return NextResponse.json({ ok: false, error: "Bounty not found" }, { status: 404 });
-    }
-    return NextResponse.json({ ok: true, bounty: mapBounty(bounty) });
-  } catch (error) {
-    console.error(error);
-    return NextResponse.json({ ok: false, error: "Failed to fetch bounty" }, { status: 500 });
-  }
-}
+// export async function GET(_: NextRequest, { params }: { params: { id: string } }) {
+//   try {
+//     const bounty = await getBountyOr404(params.id);
+//     if (!bounty) {
+//       return NextResponse.json({ ok: false, error: "Bounty not found" }, { status: 404 });
+//     }
+//     return NextResponse.json({ ok: true, bounty: mapBounty(bounty) });
+//   } catch (error) {
+//     console.error(error);
+//     return NextResponse.json({ ok: false, error: "Failed to fetch bounty" }, { status: 500 });
+//   }
+// }
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   try {
