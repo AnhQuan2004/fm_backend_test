@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { z } from "zod";
 import { getSupabaseClient } from "@/lib/supabase";
 import { verifySession } from "@/lib/jwt";
+import { handleOptions, withCors } from "@/lib/cors";
 
 const categoryEnum = z.enum(["dev", "content", "design", "research"]);
 const statusEnum = z.enum(["open", "in_review", "closed"]);
@@ -53,6 +54,14 @@ function mapBounty(row: BountyRow) {
   };
 }
 
+function jsonWithCors(req: NextRequest, body: unknown, init?: ResponseInit) {
+  return withCors(req, NextResponse.json(body, init));
+}
+
+export async function OPTIONS(req: NextRequest) {
+  return handleOptions(req);
+}
+
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = req.nextUrl;
@@ -63,7 +72,7 @@ export async function GET(req: NextRequest) {
     });
 
     if (!parsed.success) {
-      return NextResponse.json({ ok: false, error: "Invalid filters" }, { status: 400 });
+      return jsonWithCors(req, { ok: false, error: "Invalid filters" }, { status: 400 });
     }
 
     const supabase = getSupabaseClient();
@@ -86,13 +95,13 @@ export async function GET(req: NextRequest) {
       throw new Error(`Failed to load bounties: ${error.message}`);
     }
 
-    return NextResponse.json({
+    return jsonWithCors(req, {
       ok: true,
       bounties: (data ?? []).map(row => mapBounty(row as BountyRow)),
     });
   } catch (error) {
     console.error(error);
-    return NextResponse.json({ ok: false, error: "Failed to fetch bounties" }, { status: 500 });
+    return jsonWithCors(req, { ok: false, error: "Failed to fetch bounties" }, { status: 500 });
   }
 }
 
@@ -101,18 +110,19 @@ export async function POST(req: NextRequest) {
     const cookieStore = await cookies();
     const sessionCookie = cookieStore.get("session");
     if (!sessionCookie) {
-      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+      return jsonWithCors(req, { ok: false, error: "Unauthorized" }, { status: 401 });
     }
 
     const session = verifySession(sessionCookie.value);
     if (!session) {
-      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+      return jsonWithCors(req, { ok: false, error: "Unauthorized" }, { status: 401 });
     }
 
     const json = await req.json();
     const parsed = createSchema.safeParse(json);
     if (!parsed.success) {
-      return NextResponse.json(
+      return jsonWithCors(
+        req,
         { ok: false, error: parsed.error.flatten().fieldErrors },
         { status: 400 },
       );
@@ -143,9 +153,9 @@ export async function POST(req: NextRequest) {
       throw new Error(`Failed to create bounty: ${error.message}`);
     }
 
-    return NextResponse.json({ ok: true, bounty: mapBounty(data) }, { status: 201 });
+    return jsonWithCors(req, { ok: true, bounty: mapBounty(data) }, { status: 201 });
   } catch (error) {
     console.error(error);
-    return NextResponse.json({ ok: false, error: "Failed to create bounty" }, { status: 500 });
+    return jsonWithCors(req, { ok: false, error: "Failed to create bounty" }, { status: 500 });
   }
 }
