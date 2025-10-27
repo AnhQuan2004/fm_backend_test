@@ -63,9 +63,9 @@ async function getBountyOr404(id: string) {
   return data as BountyRow;
 }
 
-export async function GET(req: NextRequest, context: { params: { id: string } }) {
+export async function GET(_: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const bounty = await getBountyOr404(context.params.id);
+    const bounty = await getBountyOr404(params.id);
     if (!bounty) {
       return NextResponse.json({ ok: false, error: "Bounty not found" }, { status: 404 });
     }
