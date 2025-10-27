@@ -63,9 +63,10 @@ async function getBountyOr404(id: string) {
   return data as BountyRow;
 }
 
-// export async function GET(_: NextRequest, { params }: { params: { id: string } }) {
+// export async function GET(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
 //   try {
-//     const bounty = await getBountyOr404(params.id);
+//     const { id } = await params;
+//     const bounty = await getBountyOr404(id);
 //     if (!bounty) {
 //       return NextResponse.json({ ok: false, error: "Bounty not found" }, { status: 404 });
 //     }
@@ -76,7 +77,7 @@ async function getBountyOr404(id: string) {
 //   }
 // }
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const cookieStore = await cookies();
     const sessionCookie = cookieStore.get("session");
@@ -89,7 +90,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
     }
 
-    const existing = await getBountyOr404(params.id);
+    const { id } = await params;
+
+    const existing = await getBountyOr404(id);
     if (!existing) {
       return NextResponse.json({ ok: false, error: "Bounty not found" }, { status: 404 });
     }
@@ -123,7 +126,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     const { data, error } = await supabase
       .from("bounties")
       .update(updates)
-      .eq("id", params.id)
+      .eq("id", id)
       .select("*")
       .single();
 
@@ -138,7 +141,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
 }
 
-export async function DELETE(_: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const cookieStore = await cookies();
     const sessionCookie = cookieStore.get("session");
@@ -151,7 +154,9 @@ export async function DELETE(_: NextRequest, { params }: { params: { id: string 
       return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
     }
 
-    const existing = await getBountyOr404(params.id);
+    const { id } = await params;
+
+    const existing = await getBountyOr404(id);
     if (!existing) {
       return NextResponse.json({ ok: false, error: "Bounty not found" }, { status: 404 });
     }
@@ -161,7 +166,7 @@ export async function DELETE(_: NextRequest, { params }: { params: { id: string 
     }
 
     const supabase = getSupabaseClient();
-    const { error } = await supabase.from("bounties").delete().eq("id", params.id);
+    const { error } = await supabase.from("bounties").delete().eq("id", id);
     if (error) {
       throw new Error(`Failed to delete bounty: ${error.message}`);
     }
