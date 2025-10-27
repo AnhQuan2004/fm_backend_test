@@ -3,6 +3,7 @@ import { getSupabaseClient } from "@/lib/supabase";
 import { z } from "zod";
 import { cookies } from "next/headers";
 import { verifySession } from "@/lib/jwt";
+import { handleOptions, withCors } from "@/lib/cors";
 
 const profileInputSchema = z.object({
   email: z.string().email(),
@@ -79,11 +80,19 @@ async function resolveEmail(req: NextRequest): Promise<string | null> {
   return session?.email ?? null;
 }
 
+function jsonWithCors(req: NextRequest, body: unknown, init?: ResponseInit) {
+  return withCors(req, NextResponse.json(body, init));
+}
+
+export async function OPTIONS(req: NextRequest) {
+  return handleOptions(req);
+}
+
 export async function GET(req: NextRequest) {
   try {
     const email = await resolveEmail(req);
     if (!email) {
-      return NextResponse.json({ ok: false, error: "Missing email" }, { status: 400 });
+      return jsonWithCors(req, { ok: false, error: "Missing email" }, { status: 400 });
     }
 
     const supabase = getSupabaseClient();
@@ -114,10 +123,10 @@ export async function GET(req: NextRequest) {
     } | null;
 
     if (!user) {
-      return NextResponse.json({ ok: false, error: "User not found" }, { status: 404 });
+      return jsonWithCors(req, { ok: false, error: "User not found" }, { status: 404 });
     }
 
-    return NextResponse.json({
+    return jsonWithCors(req, {
       ok: true,
       profile: {
         email: user.email,
@@ -136,7 +145,7 @@ export async function GET(req: NextRequest) {
     });
   } catch (error) {
     console.error(error);
-    return NextResponse.json({ ok: false, error: "Failed to fetch profile" }, { status: 500 });
+    return jsonWithCors(req, { ok: false, error: "Failed to fetch profile" }, { status: 500 });
   }
 }
 
@@ -145,7 +154,8 @@ export async function POST(req: NextRequest) {
     const json = await req.json();
     const parsed = profileInputSchema.safeParse(json);
     if (!parsed.success) {
-      return NextResponse.json(
+      return jsonWithCors(
+        req,
         { ok: false, error: parsed.error.flatten().fieldErrors },
         { status: 400 },
       );
@@ -224,7 +234,7 @@ export async function POST(req: NextRequest) {
       updated_at: string | null;
     };
 
-    return NextResponse.json({
+    return jsonWithCors(req, {
       ok: true,
       profile: {
         email: profile.email,
@@ -243,6 +253,6 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     console.error(error);
-    return NextResponse.json({ ok: false, error: "Failed to save profile" }, { status: 500 });
+    return jsonWithCors(req, { ok: false, error: "Failed to save profile" }, { status: 500 });
   }
 }
