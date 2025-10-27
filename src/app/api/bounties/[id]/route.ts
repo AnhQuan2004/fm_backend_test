@@ -1,9 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
-import { cookies } from "next/headers";
+import { NextRequest } from "next/server";
 import { z } from "zod";
 import { getSupabaseClient } from "@/lib/supabase";
-import { verifySession } from "@/lib/jwt";
-import { handleOptions, withCors } from "@/lib/cors";
+import { handleOptions, jsonWithCors } from "@/lib/cors";
+import { getRequestSession, isAuthBypassEnabled } from "@/lib/auth";
 
 const categoryEnum = z.enum(["dev", "content", "design", "research"]);
 const statusEnum = z.enum(["open", "in_review", "closed"]);
@@ -64,22 +63,18 @@ async function getBountyOr404(id: string) {
   return data as BountyRow;
 }
 
-export async function GET(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
     const bounty = await getBountyOr404(id);
     if (!bounty) {
-      return NextResponse.json({ ok: false, error: "Bounty not found" }, { status: 404 });
+      return jsonWithCors(req, { ok: false, error: "Bounty not found" }, { status: 404 });
     }
-    return NextResponse.json({ ok: true, bounty: mapBounty(bounty) });
+    return jsonWithCors(req, { ok: true, bounty: mapBounty(bounty) });
   } catch (error) {
     console.error(error);
-    return NextResponse.json({ ok: false, error: "Failed to fetch bounty" }, { status: 500 });
+    return jsonWithCors(req, { ok: false, error: "Failed to fetch bounty" }, { status: 500 });
   }
-}
-
-function jsonWithCors(req: NextRequest, body: unknown, init?: ResponseInit) {
-  return withCors(req, NextResponse.json(body, init));
 }
 
 export async function OPTIONS(
@@ -92,14 +87,9 @@ export async function OPTIONS(
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get("session");
-    if (!sessionCookie) {
-      return jsonWithCors(req, { ok: false, error: "Unauthorized" }, { status: 401 });
-    }
-
-    const session = verifySession(sessionCookie.value);
-    if (!session) {
+    const session = await getRequestSession();
+    const authBypass = isAuthBypassEnabled();
+    if (!session && !authBypass) {
       return jsonWithCors(req, { ok: false, error: "Unauthorized" }, { status: 401 });
     }
 
@@ -109,7 +99,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       return jsonWithCors(req, { ok: false, error: "Bounty not found" }, { status: 404 });
     }
 
-    if (existing.created_by !== session.userId) {
+    if (!authBypass && (!session || existing.created_by !== session.userId)) {
       return jsonWithCors(req, { ok: false, error: "Forbidden" }, { status: 403 });
     }
 
@@ -156,14 +146,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get("session");
-    if (!sessionCookie) {
-      return jsonWithCors(req, { ok: false, error: "Unauthorized" }, { status: 401 });
-    }
-
-    const session = verifySession(sessionCookie.value);
-    if (!session) {
+    const session = await getRequestSession();
+    const authBypass = isAuthBypassEnabled();
+    if (!session && !authBypass) {
       return jsonWithCors(req, { ok: false, error: "Unauthorized" }, { status: 401 });
     }
 
@@ -173,7 +158,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
       return jsonWithCors(req, { ok: false, error: "Bounty not found" }, { status: 404 });
     }
 
-    if (existing.created_by !== session.userId) {
+    if (!authBypass && (!session || existing.created_by !== session.userId)) {
       return jsonWithCors(req, { ok: false, error: "Forbidden" }, { status: 403 });
     }
 

@@ -1,9 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
-import { cookies } from "next/headers";
+import { NextRequest } from "next/server";
 import { z } from "zod";
 import { getSupabaseClient } from "@/lib/supabase";
-import { verifySession } from "@/lib/jwt";
-import { handleOptions, withCors } from "@/lib/cors";
+import { handleOptions, jsonWithCors } from "@/lib/cors";
+import { getRequestSession, isAuthBypassEnabled } from "@/lib/auth";
 
 const categoryEnum = z.enum(["dev", "content", "design", "research"]);
 const statusEnum = z.enum(["open", "in_review", "closed"]);
@@ -36,6 +35,7 @@ const createSchema = z.object({
   rewardToken: z.string().trim().min(1, "Reward token không được rỗng"),
   deadline: z.string().datetime(),
   status: statusEnum.optional(),
+  createdBy: z.string().uuid().optional(),
 });
 
 function mapBounty(row: BountyRow) {
@@ -52,10 +52,6 @@ function mapBounty(row: BountyRow) {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
-}
-
-function jsonWithCors(req: NextRequest, body: unknown, init?: ResponseInit) {
-  return withCors(req, NextResponse.json(body, init));
 }
 
 export async function OPTIONS(req: NextRequest) {
@@ -107,14 +103,8 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get("session");
-    if (!sessionCookie) {
-      return jsonWithCors(req, { ok: false, error: "Unauthorized" }, { status: 401 });
-    }
-
-    const session = verifySession(sessionCookie.value);
-    if (!session) {
+    const session = await getRequestSession();
+    if (!session && !isAuthBypassEnabled()) {
       return jsonWithCors(req, { ok: false, error: "Unauthorized" }, { status: 401 });
     }
 
@@ -124,6 +114,21 @@ export async function POST(req: NextRequest) {
       return jsonWithCors(
         req,
         { ok: false, error: parsed.error.flatten().fieldErrors },
+        { status: 400 },
+      );
+    }
+
+    const ownerId =
+      session?.userId ??
+      parsed.data.createdBy ??
+      process.env.BYPASS_USER_ID ??
+      process.env.TEST_USER_ID ??
+      null;
+
+    if (!ownerId) {
+      return jsonWithCors(
+        req,
+        { ok: false, error: "Missing creator identity for bounty" },
         { status: 400 },
       );
     }
@@ -139,7 +144,7 @@ export async function POST(req: NextRequest) {
       reward_token: parsed.data.rewardToken,
       deadline: deadlineISO,
       status: parsed.data.status ?? "open",
-      created_by: session.userId,
+      created_by: ownerId,
       updated_at: new Date().toISOString(),
     };
 

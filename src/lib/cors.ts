@@ -71,3 +71,7 @@ export function handleOptions(request: NextRequest, options?: CorsOptions) {
   const response = new NextResponse(null, { status: 204 });
   return withCors(request, response, options);
 }
+
+export function jsonWithCors(request: NextRequest, body: unknown, init?: ResponseInit) {
+  return withCors(request, NextResponse.json(body, init));
+}

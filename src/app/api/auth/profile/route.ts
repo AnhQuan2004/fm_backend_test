@@ -1,9 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { getSupabaseClient } from "@/lib/supabase";
 import { z } from "zod";
-import { cookies } from "next/headers";
-import { verifySession } from "@/lib/jwt";
-import { handleOptions, withCors } from "@/lib/cors";
+import { handleOptions, jsonWithCors } from "@/lib/cors";
+import { getRequestSession } from "@/lib/auth";
 
 const profileInputSchema = z.object({
   email: z.string().email(),
@@ -70,18 +69,8 @@ async function resolveEmail(req: NextRequest): Promise<string | null> {
     return parsedQuery.data.email;
   }
 
-  const cookieStore = await cookies();
-  const sessionCookie = cookieStore.get("session");
-  if (!sessionCookie) {
-    return null;
-  }
-
-  const session = verifySession(sessionCookie.value);
+  const session = await getRequestSession();
   return session?.email ?? null;
-}
-
-function jsonWithCors(req: NextRequest, body: unknown, init?: ResponseInit) {
-  return withCors(req, NextResponse.json(body, init));
 }
 
 export async function OPTIONS(req: NextRequest) {

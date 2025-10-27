@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from "next/server";
-import { cookies } from "next/headers";
+import { NextRequest } from "next/server";
 import { z } from "zod";
 import { getSupabaseClient } from "@/lib/supabase";
-import { verifySession } from "@/lib/jwt";
+import { getRequestSession, isAuthBypassEnabled } from "@/lib/auth";
+import { handleOptions, jsonWithCors } from "@/lib/cors";
 
 const roleEnum = z.enum(["user", "partner", "admin"]);
 
@@ -11,17 +11,15 @@ const updateRoleSchema = z.object({
   role: roleEnum,
 });
 
+export async function OPTIONS(req: NextRequest) {
+  return handleOptions(req);
+}
+
 export async function PATCH(req: NextRequest) {
   try {
-    const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get("session");
-    if (!sessionCookie) {
-      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-    }
-
-    const session = verifySession(sessionCookie.value);
-    if (!session) {
-      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+    const session = await getRequestSession();
+    if (!session && !isAuthBypassEnabled()) {
+      return jsonWithCors(req, { ok: false, error: "Unauthorized" }, { status: 401 });
     }
 
     const supabase = getSupabaseClient();
@@ -29,7 +27,8 @@ export async function PATCH(req: NextRequest) {
     const json = await req.json();
     const parsed = updateRoleSchema.safeParse(json);
     if (!parsed.success) {
-      return NextResponse.json(
+      return jsonWithCors(
+        req,
         { ok: false, error: parsed.error.flatten().fieldErrors },
         { status: 400 },
       );
@@ -52,7 +51,7 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ ok: false, error: "User not found" }, { status: 404 });
     }
 
-    return NextResponse.json({
+    return jsonWithCors(req, {
       ok: true,
       user: {
         email: updatedRecord.email,
@@ -62,6 +61,6 @@ export async function PATCH(req: NextRequest) {
     });
   } catch (error) {
     console.error(error);
-    return NextResponse.json({ ok: false, error: "Failed to update role" }, { status: 500 });
+    return jsonWithCors(req, { ok: false, error: "Failed to update role" }, { status: 500 });
   }
 }
