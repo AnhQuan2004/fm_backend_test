@@ -11,11 +11,11 @@ type BountyRow = {
   id: string;
   title: string;
   description: string;
-  category: (typeof categoryEnum)["Enum"];
+  category: z.infer<typeof categoryEnum>;
   reward_amount: number;
   reward_token: string;
   deadline: string;
-  status: (typeof statusEnum)["Enum"];
+  status: z.infer<typeof statusEnum>;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -63,9 +63,9 @@ async function getBountyOr404(id: string) {
   return data as BountyRow;
 }
 
-export async function GET(_: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, context: { params: { id: string } }) {
   try {
-    const bounty = await getBountyOr404(params.id);
+    const bounty = await getBountyOr404(context.params.id);
     if (!bounty) {
       return NextResponse.json({ ok: false, error: "Bounty not found" }, { status: 404 });
     }
