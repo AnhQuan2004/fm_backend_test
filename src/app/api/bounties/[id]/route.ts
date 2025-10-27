@@ -11,11 +11,11 @@ type BountyRow = {
   id: string;
   title: string;
   description: string;
-  category: (typeof categoryEnum)["Enum"];
+  category: z.infer<typeof categoryEnum>;
   reward_amount: number;
   reward_token: string;
   deadline: string;
-  status: (typeof statusEnum)["Enum"];
+  status: z.infer<typeof statusEnum>;
   created_by: string;
   created_at: string;
   updated_at: string;
