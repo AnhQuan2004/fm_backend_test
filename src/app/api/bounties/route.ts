@@ -1,0 +1,151 @@
+import { NextRequest, NextResponse } from "next/server";
+import { cookies } from "next/headers";
+import { z } from "zod";
+import { getSupabaseClient } from "@/lib/supabase";
+import { verifySession } from "@/lib/jwt";
+
+const categoryEnum = z.enum(["dev", "content", "design", "research"]);
+const statusEnum = z.enum(["open", "in_review", "closed"]);
+
+const listQuerySchema = z.object({
+  status: statusEnum.optional(),
+  category: categoryEnum.optional(),
+  createdBy: z.string().uuid().optional(),
+});
+
+type BountyRow = {
+  id: string;
+  title: string;
+  description: string;
+  category: (typeof categoryEnum)["Enum"];
+  reward_amount: number;
+  reward_token: string;
+  deadline: string;
+  status: (typeof statusEnum)["Enum"];
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+};
+
+const createSchema = z.object({
+  title: z.string().trim().min(3, "Title phải có ít nhất 3 ký tự"),
+  description: z.string().trim().min(10, "Description quá ngắn"),
+  category: categoryEnum,
+  rewardAmount: z.number().positive("Reward amount phải > 0"),
+  rewardToken: z.string().trim().min(1, "Reward token không được rỗng"),
+  deadline: z.string().datetime(),
+  status: statusEnum.optional(),
+});
+
+function mapBounty(row: BountyRow) {
+  return {
+    id: row.id,
+    title: row.title,
+    description: row.description,
+    category: row.category,
+    rewardAmount: Number(row.reward_amount),
+    rewardToken: row.reward_token,
+    deadline: row.deadline,
+    status: row.status,
+    createdBy: row.created_by,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+export async function GET(req: NextRequest) {
+  try {
+    const { searchParams } = req.nextUrl;
+    const parsed = listQuerySchema.safeParse({
+      status: searchParams.get("status") ?? undefined,
+      category: searchParams.get("category") ?? undefined,
+      createdBy: searchParams.get("createdBy") ?? undefined,
+    });
+
+    if (!parsed.success) {
+      return NextResponse.json({ ok: false, error: "Invalid filters" }, { status: 400 });
+    }
+
+    const supabase = getSupabaseClient();
+    let query = supabase.from("bounties").select("*").order("created_at", { ascending: false });
+
+    if (parsed.data.status) {
+      query = query.eq("status", parsed.data.status);
+    }
+
+    if (parsed.data.category) {
+      query = query.eq("category", parsed.data.category);
+    }
+
+    if (parsed.data.createdBy) {
+      query = query.eq("created_by", parsed.data.createdBy);
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      throw new Error(`Failed to load bounties: ${error.message}`);
+    }
+
+    return NextResponse.json({
+      ok: true,
+      bounties: (data ?? []).map(row => mapBounty(row as BountyRow)),
+    });
+  } catch (error) {
+    console.error(error);
+    return NextResponse.json({ ok: false, error: "Failed to fetch bounties" }, { status: 500 });
+  }
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const cookieStore = await cookies();
+    const sessionCookie = cookieStore.get("session");
+    if (!sessionCookie) {
+      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+    }
+
+    const session = verifySession(sessionCookie.value);
+    if (!session) {
+      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+    }
+
+    const json = await req.json();
+    const parsed = createSchema.safeParse(json);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { ok: false, error: parsed.error.flatten().fieldErrors },
+        { status: 400 },
+      );
+    }
+
+    const supabase = getSupabaseClient();
+    const deadlineISO = new Date(parsed.data.deadline).toISOString();
+
+    const insertPayload = {
+      title: parsed.data.title,
+      description: parsed.data.description,
+      category: parsed.data.category,
+      reward_amount: parsed.data.rewardAmount,
+      reward_token: parsed.data.rewardToken,
+      deadline: deadlineISO,
+      status: parsed.data.status ?? "open",
+      created_by: session.userId,
+      updated_at: new Date().toISOString(),
+    };
+
+    const { data, error } = await supabase
+      .from("bounties")
+      .insert(insertPayload)
+      .select("*")
+      .single();
+
+    if (error) {
+      throw new Error(`Failed to create bounty: ${error.message}`);
+    }
+
+    return NextResponse.json({ ok: true, bounty: mapBounty(data) }, { status: 201 });
+  } catch (error) {
+    console.error(error);
+    return NextResponse.json({ ok: false, error: "Failed to create bounty" }, { status: 500 });
+  }
+}
