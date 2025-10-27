@@ -11,11 +11,11 @@ type BountyRow = {
   id: string;
   title: string;
   description: string;
-  category: z.infer<typeof categoryEnum>;
+  category: (typeof categoryEnum)["Enum"];
   reward_amount: number;
   reward_token: string;
   deadline: string;
-  status: z.infer<typeof statusEnum>;
+  status: (typeof statusEnum)["Enum"];
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -63,21 +63,20 @@ async function getBountyOr404(id: string) {
   return data as BountyRow;
 }
 
-// export async function GET(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-//   try {
-//     const { id } = await params;
-//     const bounty = await getBountyOr404(id);
-//     if (!bounty) {
-//       return NextResponse.json({ ok: false, error: "Bounty not found" }, { status: 404 });
-//     }
-//     return NextResponse.json({ ok: true, bounty: mapBounty(bounty) });
-//   } catch (error) {
-//     console.error(error);
-//     return NextResponse.json({ ok: false, error: "Failed to fetch bounty" }, { status: 500 });
-//   }
-// }
+export async function GET(_: NextRequest, { params }: { params: { id: string } }) {
+  try {
+    const bounty = await getBountyOr404(params.id);
+    if (!bounty) {
+      return NextResponse.json({ ok: false, error: "Bounty not found" }, { status: 404 });
+    }
+    return NextResponse.json({ ok: true, bounty: mapBounty(bounty) });
+  } catch (error) {
+    console.error(error);
+    return NextResponse.json({ ok: false, error: "Failed to fetch bounty" }, { status: 500 });
+  }
+}
 
-export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const cookieStore = await cookies();
     const sessionCookie = cookieStore.get("session");
@@ -90,9 +89,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
     }
 
-    const { id } = await params;
-
-    const existing = await getBountyOr404(id);
+    const existing = await getBountyOr404(params.id);
     if (!existing) {
       return NextResponse.json({ ok: false, error: "Bounty not found" }, { status: 404 });
     }
@@ -126,7 +123,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const { data, error } = await supabase
       .from("bounties")
       .update(updates)
-      .eq("id", id)
+      .eq("id", params.id)
       .select("*")
       .single();
 
@@ -141,7 +138,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 }
 
-export async function DELETE(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(_: NextRequest, { params }: { params: { id: string } }) {
   try {
     const cookieStore = await cookies();
     const sessionCookie = cookieStore.get("session");
@@ -154,9 +151,7 @@ export async function DELETE(_: NextRequest, { params }: { params: Promise<{ id:
       return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
     }
 
-    const { id } = await params;
-
-    const existing = await getBountyOr404(id);
+    const existing = await getBountyOr404(params.id);
     if (!existing) {
       return NextResponse.json({ ok: false, error: "Bounty not found" }, { status: 404 });
     }
@@ -166,7 +161,7 @@ export async function DELETE(_: NextRequest, { params }: { params: Promise<{ id:
     }
 
     const supabase = getSupabaseClient();
-    const { error } = await supabase.from("bounties").delete().eq("id", id);
+    const { error } = await supabase.from("bounties").delete().eq("id", params.id);
     if (error) {
       throw new Error(`Failed to delete bounty: ${error.message}`);
     }
