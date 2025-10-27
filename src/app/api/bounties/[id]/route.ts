@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { z } from "zod";
 import { getSupabaseClient } from "@/lib/supabase";
 import { verifySession } from "@/lib/jwt";
+import { handleOptions, withCors } from "@/lib/cors";
 
 const categoryEnum = z.enum(["dev", "content", "design", "research"]);
 const statusEnum = z.enum(["open", "in_review", "closed"]);
@@ -77,33 +78,46 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
   }
 }
 
+function jsonWithCors(req: NextRequest, body: unknown, init?: ResponseInit) {
+  return withCors(req, NextResponse.json(body, init));
+}
+
+export async function OPTIONS(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  await params;
+  return handleOptions(req);
+}
+
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const cookieStore = await cookies();
     const sessionCookie = cookieStore.get("session");
     if (!sessionCookie) {
-      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+      return jsonWithCors(req, { ok: false, error: "Unauthorized" }, { status: 401 });
     }
 
     const session = verifySession(sessionCookie.value);
     if (!session) {
-      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+      return jsonWithCors(req, { ok: false, error: "Unauthorized" }, { status: 401 });
     }
 
     const { id } = await params;
     const existing = await getBountyOr404(id);
     if (!existing) {
-      return NextResponse.json({ ok: false, error: "Bounty not found" }, { status: 404 });
+      return jsonWithCors(req, { ok: false, error: "Bounty not found" }, { status: 404 });
     }
 
     if (existing.created_by !== session.userId) {
-      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
+      return jsonWithCors(req, { ok: false, error: "Forbidden" }, { status: 403 });
     }
 
     const json = await req.json();
     const parsed = updateSchema.safeParse(json);
     if (!parsed.success) {
-      return NextResponse.json(
+      return jsonWithCors(
+        req,
         { ok: false, error: parsed.error.flatten().fieldErrors },
         { status: 400 },
       );
@@ -133,34 +147,34 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       throw new Error(`Failed to update bounty: ${error.message}`);
     }
 
-    return NextResponse.json({ ok: true, bounty: mapBounty(data as BountyRow) });
+    return jsonWithCors(req, { ok: true, bounty: mapBounty(data as BountyRow) });
   } catch (error) {
     console.error(error);
-    return NextResponse.json({ ok: false, error: "Failed to update bounty" }, { status: 500 });
+    return jsonWithCors(req, { ok: false, error: "Failed to update bounty" }, { status: 500 });
   }
 }
 
-export async function DELETE(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const cookieStore = await cookies();
     const sessionCookie = cookieStore.get("session");
     if (!sessionCookie) {
-      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+      return jsonWithCors(req, { ok: false, error: "Unauthorized" }, { status: 401 });
     }
 
     const session = verifySession(sessionCookie.value);
     if (!session) {
-      return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+      return jsonWithCors(req, { ok: false, error: "Unauthorized" }, { status: 401 });
     }
 
     const { id } = await params;
     const existing = await getBountyOr404(id);
     if (!existing) {
-      return NextResponse.json({ ok: false, error: "Bounty not found" }, { status: 404 });
+      return jsonWithCors(req, { ok: false, error: "Bounty not found" }, { status: 404 });
     }
 
     if (existing.created_by !== session.userId) {
-      return NextResponse.json({ ok: false, error: "Forbidden" }, { status: 403 });
+      return jsonWithCors(req, { ok: false, error: "Forbidden" }, { status: 403 });
     }
 
     const supabase = getSupabaseClient();
@@ -169,9 +183,9 @@ export async function DELETE(_: NextRequest, { params }: { params: Promise<{ id:
       throw new Error(`Failed to delete bounty: ${error.message}`);
     }
 
-    return NextResponse.json({ ok: true });
+    return jsonWithCors(req, { ok: true });
   } catch (error) {
     console.error(error);
-    return NextResponse.json({ ok: false, error: "Failed to delete bounty" }, { status: 500 });
+    return jsonWithCors(req, { ok: false, error: "Failed to delete bounty" }, { status: 500 });
   }
 }
