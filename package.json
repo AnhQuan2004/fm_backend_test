@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && next build",
+    "build": "next build",
     "start": "next start",
     "lint": "eslint"
   },
@@ -16,9 +16,7 @@
     "nodemailer": "^7.0.9",
     "react": "19.1.0",
     "react-dom": "19.1.0",
-    "zod": "^4.1.12",
-    "prisma": "^5.17.0",
-    "@prisma/client": "^5.17.0"
+    "zod": "^4.1.12"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
