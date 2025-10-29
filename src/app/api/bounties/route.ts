@@ -104,9 +104,6 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const session = await getRequestSession();
-    if (!session && !isAuthBypassEnabled()) {
-      return jsonWithCors(req, { ok: false, error: "Unauthorized" }, { status: 401 });
-    }
 
     const json = await req.json();
     const parsed = createSchema.safeParse(json);

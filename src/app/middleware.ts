@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifySession } from "@/lib/jwt";
 
-const PROTECTED_PREFIXES = ["/api/me", "/api/private"]; // ví dụ
+const PROTECTED_PREFIXES: string[] = []; // ví dụ
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
