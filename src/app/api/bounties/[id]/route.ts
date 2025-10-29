@@ -35,6 +35,16 @@ const updateSchema = z
     message: "Không có trường nào để cập nhật",
   });
 
+const putSchema = z.object({
+  title: z.string().trim().min(3, "Title phải có ít nhất 3 ký tự"),
+  description: z.string().trim().min(10, "Description quá ngắn"),
+  category: categoryEnum,
+  rewardAmount: z.number().positive("Reward amount phải > 0"),
+  rewardToken: z.string().trim().min(1, "Reward token không được rỗng"),
+  deadline: z.string().datetime(),
+  status: statusEnum,
+});
+
 function mapBounty(row: BountyRow) {
   return {
     id: row.id,
@@ -124,6 +134,64 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (parsed.data.rewardToken !== undefined) updates.reward_token = parsed.data.rewardToken;
     if (parsed.data.deadline !== undefined) updates.deadline = new Date(parsed.data.deadline).toISOString();
     if (parsed.data.status !== undefined) updates.status = parsed.data.status;
+
+    const supabase = getSupabaseClient();
+    const { data, error } = await supabase
+      .from("bounties")
+      .update(updates)
+      .eq("id", id)
+      .select("*")
+      .single();
+
+    if (error) {
+      throw new Error(`Failed to update bounty: ${error.message}`);
+    }
+
+    return jsonWithCors(req, { ok: true, bounty: mapBounty(data as BountyRow) });
+  } catch (error) {
+    console.error(error);
+    return jsonWithCors(req, { ok: false, error: "Failed to update bounty" }, { status: 500 });
+  }
+}
+
+export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const session = await getRequestSession();
+    const authBypass = isAuthBypassEnabled();
+    if (!session && !authBypass) {
+      return jsonWithCors(req, { ok: false, error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { id } = await params;
+    const existing = await getBountyOr404(id);
+    if (!existing) {
+      return jsonWithCors(req, { ok: false, error: "Bounty not found" }, { status: 404 });
+    }
+
+    if (!authBypass && (!session || existing.created_by !== session.userId)) {
+      return jsonWithCors(req, { ok: false, error: "Forbidden" }, { status: 403 });
+    }
+
+    const json = await req.json();
+    const parsed = putSchema.safeParse(json);
+    if (!parsed.success) {
+      return jsonWithCors(
+        req,
+        { ok: false, error: parsed.error.flatten().fieldErrors },
+        { status: 400 },
+      );
+    }
+
+    const updates = {
+      title: parsed.data.title,
+      description: parsed.data.description,
+      category: parsed.data.category,
+      reward_amount: parsed.data.rewardAmount,
+      reward_token: parsed.data.rewardToken,
+      deadline: new Date(parsed.data.deadline).toISOString(),
+      status: parsed.data.status,
+      updated_at: new Date().toISOString(),
+    };
 
     const supabase = getSupabaseClient();
     const { data, error } = await supabase
