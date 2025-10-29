@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { z } from "zod";
 import { getSupabaseClient } from "@/lib/supabase";
 import { handleOptions, jsonWithCors } from "@/lib/cors";
-import { getRequestSession, isAuthBypassEnabled } from "@/lib/auth";
+import { getRequestSession } from "@/lib/auth";
 
 const categoryEnum = z.enum(["dev", "content", "design", "research"]);
 const statusEnum = z.enum(["open", "in_review", "closed"]);
