@@ -5,7 +5,7 @@ import { handleOptions, jsonWithCors } from "@/lib/cors";
 import { getRequestSession } from "@/lib/auth";
 
 const categoryEnum = z.enum(["dev", "content", "design", "research"]);
-const statusEnum = z.enum(["open", "in_review", "closed"]);
+const statusEnum = z.enum(["open", "in_review", "in-progress", "closed"]);
 
 const listQuerySchema = z.object({
   status: statusEnum.optional(),
