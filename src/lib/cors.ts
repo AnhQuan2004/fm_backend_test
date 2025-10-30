@@ -9,10 +9,13 @@ const DEFAULT_HEADERS = [
   "Origin",
 ];
 
-const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS ?? "")
-  .split(",")
-  .map(origin => origin.trim())
-  .filter(Boolean);
+// Always allow all origins in development
+const allowedOrigins = process.env.NODE_ENV === "production"
+  ? (process.env.CORS_ALLOWED_ORIGINS ?? "")
+    .split(",")
+    .map(origin => origin.trim())
+    .filter(Boolean)
+  : ["*"];
 
 type CorsOptions = {
   allowMethods?: string[];
@@ -22,15 +25,19 @@ type CorsOptions = {
 };
 
 function resolveOrigin(requestOrigin: string | null) {
-  if (!requestOrigin) {
-    return null;
-  }
-  if (allowedOrigins.length === 0) {
-    return requestOrigin;
-  }
+  // In development or when wildcard is allowed, accept any origin
   if (allowedOrigins.includes("*")) {
     return requestOrigin ?? "*";
   }
+  
+  if (!requestOrigin) {
+    return null;
+  }
+  
+  if (allowedOrigins.length === 0) {
+    return requestOrigin;
+  }
+  
   return allowedOrigins.includes(requestOrigin) ? requestOrigin : null;
 }
 

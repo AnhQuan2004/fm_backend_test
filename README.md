@@ -93,6 +93,8 @@ create table if not exists public.bounties (
   deadline timestamptz not null,
   status bounty_status not null default 'open',
   created_by uuid not null references public.users(id) on delete cascade,
+  creator_email text,
+  creator_username text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -275,6 +277,8 @@ For endpoints that require authentication, include the `session` cookie returned
         "deadline": "2025-02-01T00:00:00Z",
         "status": "open",
         "createdBy": "uuid",
+        "creatorEmail": "user@example.com",
+        "creatorUsername": "username",
         "createdAt": "2025-01-05T12:00:00Z",
         "updatedAt": "2025-01-05T12:00:00Z"
       }
@@ -294,7 +298,9 @@ For endpoints that require authentication, include the `session` cookie returned
     "rewardAmount": 250,
     "rewardToken": "USDC",
     "deadline": "2025-02-01T00:00:00Z",
-    "status": "open"
+    "status": "open",
+    "creatorEmail": "user@example.com",
+    "creatorUsername": "username"
   }
   ```
 - **Success (201):** Returns created bounty object.
@@ -308,9 +314,9 @@ For endpoints that require authentication, include the `session` cookie returned
 #### `PATCH /api/bounties/:id`
 - **Purpose:** Update selected fields on a bounty.
 - **Auth:** `session` cookie; only creator may update.
-- **Body:** Any subset of `title`, `description`, `category`, `rewardAmount`, `rewardToken`, `deadline`, `status`.
+- **Body:** Any subset of `title`, `description`, `category`, `rewardAmount`, `rewardToken`, `deadline`, `status`, `creatorEmail`, `creatorUsername`.
   ```json
-  { "status": "in_review", "rewardAmount": 300 }
+  { "status": "in_review", "rewardAmount": 300, "creatorEmail": "new@example.com", "creatorUsername": "newusername" }
   ```
 - **Success (200):** Updated bounty.
 - **Errors:** `401` no session; `403` not creator; `404` missing; `400` when no fields provided.
