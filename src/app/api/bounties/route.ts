@@ -23,6 +23,8 @@ type BountyRow = {
   deadline: string;
   status: z.infer<typeof statusEnum>;
   created_by: string;
+  creator_email: string;
+  creator_username: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -49,6 +51,8 @@ function mapBounty(row: BountyRow) {
     deadline: row.deadline,
     status: row.status,
     createdBy: row.created_by,
+    creatorEmail: row.creator_email,
+    creatorUsername: row.creator_username,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -130,6 +134,35 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Get the creator's email from the session or fetch it from the database
+    let creatorEmail = session?.email ?? process.env.BYPASS_USER_EMAIL ?? process.env.TEST_USER_EMAIL;
+    let creatorUsername = null;
+    
+    // If we don't have the email but have the userId, fetch it from the database
+    if (ownerId) {
+      const supabase = getSupabaseClient();
+      const { data: userData, error: userError } = await supabase
+        .from("users")
+        .select("email, username")
+        .eq("id", ownerId)
+        .maybeSingle();
+        
+      if (userError) {
+        console.error("Failed to fetch user data:", userError);
+      } else if (userData) {
+        if (!creatorEmail) creatorEmail = userData.email;
+        creatorUsername = userData.username;
+      }
+    }
+
+    if (!creatorEmail) {
+      return jsonWithCors(
+        req,
+        { ok: false, error: "Missing creator email for bounty" },
+        { status: 400 },
+      );
+    }
+
     const supabase = getSupabaseClient();
     const deadlineISO = new Date(parsed.data.deadline).toISOString();
 
@@ -142,6 +175,8 @@ export async function POST(req: NextRequest) {
       deadline: deadlineISO,
       status: parsed.data.status ?? "open",
       created_by: ownerId,
+      creator_email: creatorEmail,
+      creator_username: creatorUsername,
       updated_at: new Date().toISOString(),
     };
 

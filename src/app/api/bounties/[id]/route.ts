@@ -17,6 +17,8 @@ type BountyRow = {
   deadline: string;
   status: z.infer<typeof statusEnum>;
   created_by: string;
+  creator_email: string;
+  creator_username: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -56,6 +58,8 @@ function mapBounty(row: BountyRow) {
     deadline: row.deadline,
     status: row.status,
     createdBy: row.created_by,
+    creatorEmail: row.creator_email,
+    creatorUsername: row.creator_username,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
