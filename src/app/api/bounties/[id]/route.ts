@@ -32,6 +32,8 @@ const updateSchema = z
     rewardToken: z.string().trim().min(1, "Reward token không được rỗng").optional(),
     deadline: z.string().datetime().optional(),
     status: statusEnum.optional(),
+    creatorEmail: z.string().email("Email không hợp lệ").optional(),
+    creatorUsername: z.string().optional(),
   })
   .refine(data => Object.values(data).some(value => value !== undefined), {
     message: "Không có trường nào để cập nhật",
@@ -45,6 +47,8 @@ const putSchema = z.object({
   rewardToken: z.string().trim().min(1, "Reward token không được rỗng"),
   deadline: z.string().datetime(),
   status: statusEnum,
+  creatorEmail: z.string().email("Email không hợp lệ").optional(),
+  creatorUsername: z.string().optional(),
 });
 
 function mapBounty(row: BountyRow) {
@@ -138,6 +142,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (parsed.data.rewardToken !== undefined) updates.reward_token = parsed.data.rewardToken;
     if (parsed.data.deadline !== undefined) updates.deadline = new Date(parsed.data.deadline).toISOString();
     if (parsed.data.status !== undefined) updates.status = parsed.data.status;
+    if (parsed.data.creatorEmail !== undefined) updates.creator_email = parsed.data.creatorEmail;
+    if (parsed.data.creatorUsername !== undefined) updates.creator_username = parsed.data.creatorUsername;
 
     const supabase = getSupabaseClient();
     const { data, error } = await supabase
@@ -186,7 +192,7 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       );
     }
 
-    const updates = {
+    const updates: Record<string, unknown> = {
       title: parsed.data.title,
       description: parsed.data.description,
       category: parsed.data.category,
@@ -196,6 +202,14 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       status: parsed.data.status,
       updated_at: new Date().toISOString(),
     };
+    
+    if (parsed.data.creatorEmail) {
+      updates.creator_email = parsed.data.creatorEmail;
+    }
+    
+    if (parsed.data.creatorUsername !== undefined) {
+      updates.creator_username = parsed.data.creatorUsername;
+    }
 
     const supabase = getSupabaseClient();
     const { data, error } = await supabase
