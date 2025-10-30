@@ -11,6 +11,7 @@ const listQuerySchema = z.object({
   status: statusEnum.optional(),
   category: categoryEnum.optional(),
   createdBy: z.string().uuid().optional(),
+  creatorUsername: z.string().optional(),
 });
 
 type BountyRow = {
@@ -71,6 +72,7 @@ export async function GET(req: NextRequest) {
       status: searchParams.get("status") ?? undefined,
       category: searchParams.get("category") ?? undefined,
       createdBy: searchParams.get("createdBy") ?? undefined,
+      creatorUsername: searchParams.get("creatorUsername") ?? undefined,
     });
 
     if (!parsed.success) {
@@ -90,6 +92,10 @@ export async function GET(req: NextRequest) {
 
     if (parsed.data.createdBy) {
       query = query.eq("created_by", parsed.data.createdBy);
+    }
+    
+    if (parsed.data.creatorUsername) {
+      query = query.eq("creator_username", parsed.data.creatorUsername);
     }
 
     const { data, error } = await query;

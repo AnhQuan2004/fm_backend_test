@@ -182,6 +182,29 @@ export async function POST(req: NextRequest) {
       skills?.map(skill => skill.trim()).filter(skill => skill.length > 0) ?? [];
 
     const supabase = getSupabaseClient();
+    
+    // Check if username is already taken by another user
+    if (sanitizedUsername) {
+      const { data: existingUser, error: lookupError } = await supabase
+        .from("users")
+        .select("email")
+        .eq("username", sanitizedUsername)
+        .neq("email", email) // Exclude the current user
+        .maybeSingle();
+      
+      if (lookupError) {
+        throw new Error(`Failed to check username availability: ${lookupError.message}`);
+      }
+      
+      if (existingUser) {
+        return jsonWithCors(
+          req,
+          { ok: false, error: { username: ["Username đã được sử dụng"] } },
+          { status: 400 },
+        );
+      }
+    }
+    
     const payload = {
       email,
       username: sanitizedUsername,

@@ -262,6 +262,7 @@ For endpoints that require authentication, include the `session` cookie returned
   - `status`: `open | in_review | closed`
   - `category`: `dev | content | design | research`
   - `createdBy`: UUID of creator
+  - `creatorUsername`: Username of creator
 - **Success (200):**
   ```json
   {
