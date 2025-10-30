@@ -38,6 +38,8 @@ const createSchema = z.object({
   deadline: z.string().datetime(),
   status: statusEnum.optional(),
   createdBy: z.string().uuid().optional(),
+  creatorEmail: z.string().email("Email không hợp lệ").optional(),
+  creatorUsername: z.string().optional(),
 });
 
 function mapBounty(row: BountyRow) {
@@ -134,9 +136,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Get the creator's email from the session or fetch it from the database
-    let creatorEmail = session?.email ?? process.env.BYPASS_USER_EMAIL ?? process.env.TEST_USER_EMAIL;
-    let creatorUsername = null;
+    // Get the creator's email from the request, session, or fetch it from the database
+    let creatorEmail = parsed.data.creatorEmail ?? session?.email ?? process.env.BYPASS_USER_EMAIL ?? process.env.TEST_USER_EMAIL;
+    let creatorUsername = parsed.data.creatorUsername ?? null;
     
     // If we don't have the email but have the userId, fetch it from the database
     if (ownerId) {
@@ -151,7 +153,7 @@ export async function POST(req: NextRequest) {
         console.error("Failed to fetch user data:", userError);
       } else if (userData) {
         if (!creatorEmail) creatorEmail = userData.email;
-        creatorUsername = userData.username;
+        if (!creatorUsername) creatorUsername = userData.username;
       }
     }
 
