@@ -9,12 +9,15 @@ const DEFAULT_HEADERS = [
   "Origin",
 ];
 
-// Always allow all origins in development
+// Always allow all origins in development and add specific production origins
 const allowedOrigins = process.env.NODE_ENV === "production"
-  ? (process.env.CORS_ALLOWED_ORIGINS ?? "")
-    .split(",")
-    .map(origin => origin.trim())
-    .filter(Boolean)
+  ? [
+      "https://fm-pied.vercel.app",
+      ...(process.env.CORS_ALLOWED_ORIGINS ?? "")
+        .split(",")
+        .map(origin => origin.trim())
+        .filter(Boolean)
+    ]
   : ["*"];
 
 type CorsOptions = {
