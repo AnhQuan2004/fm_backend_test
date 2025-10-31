@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
 async function verifyCore(
     data: { email: string; otp: string; tokenId: string },
     redirectOnSuccess: boolean,
-    req?: NextRequest
+    req: NextRequest // Make req required, not optional
 ) {
     try {
         const supabase = getSupabaseClient();
@@ -68,7 +68,7 @@ async function verifyCore(
             role: string | null;
         } | null;
         if (!user) {
-            return NextResponse.json({ ok: false, error: "Email không tồn tại" }, { status: 400 });
+            return jsonWithCors(req, { ok: false, error: "Email không tồn tại" }, { status: 400 });
         }
 
         const { data: tokenData, error: tokenError } = await supabase
@@ -88,11 +88,11 @@ async function verifyCore(
             status: "PENDING" | "USED" | "EXPIRED";
         } | null;
         if (!record || record.user_id !== user.id) {
-            return NextResponse.json({ ok: false, error: "Token không hợp lệ" }, { status: 400 });
+            return jsonWithCors(req, { ok: false, error: "Token không hợp lệ" }, { status: 400 });
         }
 
         if (record.status !== "PENDING") {
-            return NextResponse.json({ ok: false, error: "OTP đã dùng hoặc không còn hiệu lực" }, { status: 400 });
+            return jsonWithCors(req, { ok: false, error: "OTP đã dùng hoặc không còn hiệu lực" }, { status: 400 });
         }
 
         const expiresAt = new Date(record.expires_at);
@@ -104,7 +104,7 @@ async function verifyCore(
             if (expireError) {
                 console.error("Failed to expire OTP after timeout:", expireError);
             }
-            return NextResponse.json({ ok: false, error: "OTP hết hạn" }, { status: 400 });
+            return jsonWithCors(req, { ok: false, error: "OTP hết hạn" }, { status: 400 });
         }
 
         if (record.attempts_left <= 0) {
@@ -115,7 +115,7 @@ async function verifyCore(
             if (expireError) {
                 console.error("Failed to expire OTP after attempts exceeded:", expireError);
             }
-            return NextResponse.json({ ok: false, error: "Đã vượt quá số lần thử" }, { status: 400 });
+            return jsonWithCors(req, { ok: false, error: "Đã vượt quá số lần thử" }, { status: 400 });
         }
 
         const ok = await bcrypt.compare(data.otp, record.otp_hash);
@@ -128,7 +128,7 @@ async function verifyCore(
             if (decrementError) {
                 console.error("Failed to decrement OTP attempts:", decrementError);
             }
-            return NextResponse.json({ ok: false, error: "OTP sai" }, { status: 400 });
+            return jsonWithCors(req, { ok: false, error: "OTP sai" }, { status: 400 });
         }
 
         // Thành công → đánh dấu USED
@@ -156,7 +156,7 @@ async function verifyCore(
             const response = NextResponse.redirect(redirectUrl);
             
             // Add CORS headers to the redirect response
-            const origin = req?.headers.get("origin") || "*";
+            const origin = req.headers.get("origin") || "*";
             response.headers.set("Access-Control-Allow-Origin", origin);
             response.headers.set("Access-Control-Allow-Credentials", "true");
             
