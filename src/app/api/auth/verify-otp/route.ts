@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
     const email = searchParams.get("email") ?? "";
     const otp = searchParams.get("otp") ?? "";
     const tokenId = searchParams.get("tokenId") ?? "";
-    return verifyCore({ email, otp, tokenId }, /*redirectOnSuccess*/ true);
+    return verifyCore({ email, otp, tokenId }, /*redirectOnSuccess*/ true, req);
 }
 
 export async function POST(req: NextRequest) {
@@ -32,12 +32,13 @@ export async function POST(req: NextRequest) {
     if (!parsed.success) {
         return jsonWithCors(req, { ok: false, error: "Invalid payload" }, { status: 400 });
     }
-    return verifyCore(parsed.data, false);
+    return verifyCore(parsed.data, false, req);
 }
 
 async function verifyCore(
     data: { email: string; otp: string; tokenId: string },
-    redirectOnSuccess: boolean
+    redirectOnSuccess: boolean,
+    req?: NextRequest
 ) {
     try {
         const supabase = getSupabaseClient();
@@ -155,7 +156,7 @@ async function verifyCore(
             const response = NextResponse.redirect(redirectUrl);
             
             // Add CORS headers to the redirect response
-            const origin = request.headers.get("origin") || "*";
+            const origin = req?.headers.get("origin") || "*";
             response.headers.set("Access-Control-Allow-Origin", origin);
             response.headers.set("Access-Control-Allow-Credentials", "true");
             
