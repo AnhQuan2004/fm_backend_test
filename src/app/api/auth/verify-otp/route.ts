@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
+import { handleOptions, jsonWithCors } from "@/lib/cors";
 import { getSupabaseClient } from "@/lib/supabase";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { cookies } from "next/headers";
 import { signSession } from "@/lib/jwt";
 import { verifySession } from "@/lib/jwt";
+
+export async function OPTIONS(req: NextRequest) {
+  return handleOptions(req);
+}
 
 const postSchema = z.object({
     email: z.string().email(),
@@ -25,7 +30,7 @@ export async function POST(req: NextRequest) {
     const json = await req.json();
     const parsed = postSchema.safeParse(json);
     if (!parsed.success) {
-        return NextResponse.json({ ok: false, error: "Invalid payload" }, { status: 400 });
+        return jsonWithCors(req, { ok: false, error: "Invalid payload" }, { status: 400 });
     }
     return verifyCore(parsed.data, false);
 }
@@ -146,10 +151,17 @@ async function verifyCore(
         const sessionData = verifySession(token);
         if (redirectOnSuccess) {
             // Điều hướng về trang chủ hoặc dashboard
-            return NextResponse.redirect(new URL("/", process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"));
+            const redirectUrl = new URL("/", process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000");
+            const response = NextResponse.redirect(redirectUrl);
+            
+            // Add CORS headers to the redirect response
+            response.headers.set("Access-Control-Allow-Origin", req.headers.get("origin") || "*");
+            response.headers.set("Access-Control-Allow-Credentials", "true");
+            
+            return response;
         }
 
-        return NextResponse.json({
+        return jsonWithCors(req, {
             ok: true,
             user: {
                 email: user.email,
@@ -169,6 +181,6 @@ async function verifyCore(
     } catch (e: unknown) {
         console.error(e);
         const message = e instanceof Error ? e.message : "Verify error";
-        return NextResponse.json({ ok: false, error: message }, { status: 400 });
+        return jsonWithCors(req, { ok: false, error: message }, { status: 400 });
     }
 }

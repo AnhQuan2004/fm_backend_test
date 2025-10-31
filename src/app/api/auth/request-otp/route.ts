@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
+import { handleOptions, jsonWithCors } from "@/lib/cors";
 import { getSupabaseClient } from "@/lib/supabase";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { addSeconds, generateNumericOTP, safeNumberEnv } from "@/lib/otp";
 import { sendOtpEmail } from "@/lib/mailer";
+
+export async function OPTIONS(req: NextRequest) {
+  return handleOptions(req);
+}
 
 const bodySchema = z.object({
   email: z.string().email(),
@@ -77,10 +82,10 @@ export async function POST(req: NextRequest) {
     const tokenId = otpRecord.id as string;
     await sendOtpEmail(email, otp, tokenId);
 
-    return NextResponse.json({ ok: true, tokenId });
+    return jsonWithCors(req, { ok: true, tokenId });
   } catch (e: unknown) {
     console.error(e);
     const message = e instanceof Error ? e.message : "Bad Request";
-    return NextResponse.json({ ok: false, error: message }, { status: 400 });
+    return jsonWithCors(req, { ok: false, error: message }, { status: 400 });
   }
 }
