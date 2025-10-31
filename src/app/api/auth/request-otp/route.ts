@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { handleOptions, jsonWithCors } from "@/lib/cors";
 import { getSupabaseClient } from "@/lib/supabase";
 import { z } from "zod";

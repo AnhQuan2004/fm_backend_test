@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { verifySession } from "@/lib/jwt";
 import { handleOptions, jsonWithCors } from "@/lib/cors";
 

@@ -155,7 +155,8 @@ async function verifyCore(
             const response = NextResponse.redirect(redirectUrl);
             
             // Add CORS headers to the redirect response
-            response.headers.set("Access-Control-Allow-Origin", req.headers.get("origin") || "*");
+            const origin = request.headers.get("origin") || "*";
+            response.headers.set("Access-Control-Allow-Origin", origin);
             response.headers.set("Access-Control-Allow-Credentials", "true");
             
             return response;
