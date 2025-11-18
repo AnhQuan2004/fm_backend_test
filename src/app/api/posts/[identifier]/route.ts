@@ -13,6 +13,7 @@ type PostRow = {
   title: string;
   slug: string | null;
   content_md: string;
+  thumnail_image: string | null;
   status: z.infer<typeof statusEnum>;
   published_at: string | null;
   created_at: string;
@@ -31,6 +32,7 @@ const updateSchema = z
     title: z.string().trim().min(3, "Title phải có ít nhất 3 ký tự").optional(),
     slug: optionalSlugSchema,
     contentMd: z.string().trim().min(1, "Content markdown không được rỗng").optional(),
+    thumnailImage: z.union([z.string().trim().min(1), z.null()]).optional(),
     status: statusEnum.optional(),
     publishedAt: z.union([z.string().datetime(), z.null()]).optional(),
   })
@@ -42,6 +44,7 @@ const putSchema = z.object({
   title: z.string().trim().min(3, "Title phải có ít nhất 3 ký tự"),
   slug: z.union([slugSchema, z.null()]),
   contentMd: z.string().trim().min(1, "Content markdown không được rỗng"),
+  thumnailImage: z.union([z.string().trim().min(1), z.null()]).optional(),
   status: statusEnum,
   publishedAt: z.union([z.string().datetime(), z.null()]).optional(),
 });
@@ -52,6 +55,7 @@ function mapPost(row: PostRow) {
     title: row.title,
     slug: row.slug,
     contentMd: row.content_md,
+    thumnailImage: row.thumnail_image,
     status: row.status,
     publishedAt: row.published_at,
     createdAt: row.created_at,
@@ -147,6 +151,7 @@ export async function PATCH(
     if (parsed.data.title !== undefined) updates.title = parsed.data.title.trim();
     if (parsed.data.slug !== undefined) updates.slug = parsed.data.slug;
     if (parsed.data.contentMd !== undefined) updates.content_md = parsed.data.contentMd.trim();
+    if (parsed.data.thumnailImage !== undefined) updates.thumnail_image = parsed.data.thumnailImage;
     if (parsed.data.status !== undefined) updates.status = parsed.data.status;
 
     const publishedAtUpdate = resolvePublishedAtUpdate(parsed.data, existing);
@@ -203,10 +208,13 @@ export async function PUT(
 
     const supabase = getSupabaseClient();
     const resolvedPublishedAt = resolvePublishedAtUpdate(parsed.data, existing);
+    const resolvedThumnail =
+      parsed.data.thumnailImage === undefined ? existing.thumnail_image : parsed.data.thumnailImage;
     const updates = {
       title: parsed.data.title.trim(),
       slug: parsed.data.slug,
       content_md: parsed.data.contentMd.trim(),
+      thumnail_image: resolvedThumnail,
       status: parsed.data.status,
       published_at: resolvedPublishedAt === undefined ? existing.published_at : resolvedPublishedAt,
       updated_at: new Date().toISOString(),

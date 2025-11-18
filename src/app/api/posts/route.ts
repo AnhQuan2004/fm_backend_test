@@ -25,6 +25,7 @@ const createSchema = z.object({
   title: z.string().trim().min(3, "Title phải có ít nhất 3 ký tự"),
   slug: optionalSlugSchema,
   contentMd: z.string().trim().min(1, "Content markdown không được rỗng"),
+  thumnailImage: z.union([z.string().trim().min(1), z.null()]).optional(),
   status: statusEnum.optional(),
   publishedAt: z.string().datetime().optional(),
 });
@@ -34,6 +35,7 @@ type PostRow = {
   title: string;
   slug: string | null;
   content_md: string;
+  thumnail_image: string | null;
   status: z.infer<typeof statusEnum>;
   published_at: string | null;
   created_at: string;
@@ -46,6 +48,7 @@ function mapPost(row: PostRow) {
     title: row.title,
     slug: row.slug,
     contentMd: row.content_md,
+    thumnailImage: row.thumnail_image,
     status: row.status,
     publishedAt: row.published_at,
     createdAt: row.created_at,
@@ -144,10 +147,13 @@ export async function POST(req: NextRequest) {
     const status = parsed.data.status ?? "draft";
     const slugValue =
       parsed.data.slug === null || parsed.data.slug === undefined ? null : parsed.data.slug;
+    const thumnailImage =
+      parsed.data.thumnailImage === undefined ? null : parsed.data.thumnailImage;
     const insertPayload = {
       title: parsed.data.title.trim(),
       slug: slugValue,
       content_md: parsed.data.contentMd.trim(),
+      thumnail_image: thumnailImage,
       status,
       published_at: resolvePublishedAt(status, parsed.data.publishedAt),
       updated_at: new Date().toISOString(),
