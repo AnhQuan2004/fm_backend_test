@@ -4,74 +4,65 @@ import { z } from "zod";
 import { handleOptions, jsonWithCors } from "@/lib/cors";
 import { getRequestSession } from "@/lib/auth";
 
+const usernameSchema = z
+  .string()
+  .trim()
+  .min(3, "Username phải có ít nhất 3 ký tự")
+  .max(50, "Username tối đa 50 ký tự")
+  .regex(/^[a-zA-Z0-9._-]+$/, "Username chỉ được chứa chữ, số và ._-");
+
 const profileInputSchema = z.object({
-  email: z.string().email(),
-  username: z
-    .string()
+  email: z.string({ required_error: "Email không được bỏ trống" }).email("Email không hợp lệ"),
+  walletAddress: z
+    .string({ required_error: "Wallet address không được bỏ trống" })
     .trim()
-    .min(3, "Username phải có ít nhất 3 ký tự")
-    .max(50, "Username tối đa 50 ký tự")
-    .regex(/^[a-zA-Z0-9._-]+$/, "Username chỉ được chứa chữ, số và ._-")
-    .optional(),
-  firstName: z
-    .string()
-    .trim()
-    .max(60, "First name tối đa 60 ký tự")
-    .optional(),
-  lastName: z
-    .string()
-    .trim()
-    .max(60, "Last name tối đa 60 ký tự")
-    .optional(),
-  location: z
-    .string()
-    .trim()
-    .max(120, "Location tối đa 120 ký tự")
-    .optional(),
-  skills: z
-    .array(z.string().trim().min(1, "Kỹ năng không được để trống").max(40, "Tên kỹ năng quá dài"))
-    .max(25, "Tối đa 25 kỹ năng")
-    .optional(),
-  socials: z
-    .string()
-    .trim()
-    .max(200, "Link socials tối đa 200 ký tự")
-    .optional(),
-  github: z
-    .string()
-    .trim()
-    .max(100, "GitHub username tối đa 100 ký tự")
-    .optional(),
-  displayName: z
-    .string()
-    .trim()
-    .min(2, "Display name phải có ít nhất 2 ký tự")
-    .max(80, "Display name tối đa 80 ký tự")
-    .optional(),
-  bio: z
-    .string()
-    .trim()
-    .min(3, "Bio phải có ít nhất 3 ký tự")
-    .max(280, "Bio tối đa 280 ký tự")
+    .min(1, "Wallet address không được bỏ trống"),
+  username: usernameSchema.optional(),
+  xpPoints: z
+    .number({ invalid_type_error: "XP phải là số" })
+    .int("XP phải là số nguyên")
+    .min(0, "XP phải lớn hơn hoặc bằng 0")
     .optional(),
 });
 
-const emailQuerySchema = z.object({
+const profileQuerySchema = z.object({
+  walletAddress: z.string().trim().min(1, "Wallet address không được bỏ trống").optional(),
   email: z.string().email().optional(),
+  all: z
+    .enum(["true", "false"])
+    .transform(value => value === "true")
+    .optional(),
 });
 
-async function resolveEmail(req: NextRequest): Promise<string | null> {
-  const parsedQuery = emailQuerySchema.safeParse({
-    email: req.nextUrl.searchParams.get("email") ?? undefined,
-  });
+const selectColumns = "id,email,wallet_address,username,role,xp_points,created_at";
 
-  if (parsedQuery.success && parsedQuery.data.email) {
-    return parsedQuery.data.email;
-  }
+type ProfileRow = {
+  id: string;
+  email: string;
+  wallet_address: string;
+  username: string | null;
+  role: string | null;
+  xp_points: number | null;
+  created_at: string | null;
+};
 
-  const session = await getRequestSession();
-  return session?.email ?? null;
-}
+const mapProfile = (row: ProfileRow) => ({
+  id: row.id,
+  email: row.email,
+  walletAddress: row.wallet_address,
+  username: row.username ?? "",
+  xpPoints: row.xp_points ?? 0,
+  role: row.role ?? "user",
+  createdAt: row.created_at,
+});
+
+const sanitizeUsername = (value?: string | null) => {
+  if (value === undefined || value === null) return null;
+  const trimmed = value.trim();
+  return trimmed.length ? trimmed : null;
+};
+
+const sanitizeEmail = (value: string) => value.trim().toLowerCase();
 
 export async function OPTIONS(req: NextRequest) {
   return handleOptions(req);
@@ -79,58 +70,72 @@ export async function OPTIONS(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
   try {
-    const email = await resolveEmail(req);
-    if (!email) {
-      return jsonWithCors(req, { ok: false, error: "Missing email" }, { status: 400 });
+    const parseResult = profileQuerySchema.safeParse({
+      walletAddress: req.nextUrl.searchParams.get("walletAddress") ?? undefined,
+      email: req.nextUrl.searchParams.get("email") ?? undefined,
+      all: req.nextUrl.searchParams.get("all") ?? undefined,
+    });
+
+    if (!parseResult.success) {
+      return jsonWithCors(
+        req,
+        { ok: false, error: parseResult.error.flatten().fieldErrors },
+        { status: 400 },
+      );
     }
 
+    const { walletAddress, email, all } = parseResult.data;
     const supabase = getSupabaseClient();
-    const { data, error } = await supabase
-      .from("users")
-      .select(
-        "email,username,first_name,last_name,location,skills,socials,github,display_name,bio,role,updated_at",
-      )
-      .eq("email", email)
-      .maybeSingle();
+
+    if (all) {
+      const { data, error } = await supabase
+        .from("users")
+        .select(selectColumns)
+        .order("created_at", { ascending: false });
+      if (error) {
+        throw new Error(`Failed to fetch profiles: ${error.message}`);
+      }
+
+      const profiles = (data as ProfileRow[]).map(mapProfile);
+      return jsonWithCors(req, { ok: true, profiles });
+    }
+
+    let resolvedWallet = walletAddress?.trim() ?? null;
+    let resolvedEmail = email ? sanitizeEmail(email) : null;
+
+    if (!resolvedWallet && !resolvedEmail) {
+      const session = await getRequestSession();
+      resolvedEmail = session?.email ? sanitizeEmail(session.email) : null;
+    }
+
+    if (!resolvedWallet && !resolvedEmail) {
+      return jsonWithCors(
+        req,
+        { ok: false, error: "Missing walletAddress hoặc email" },
+        { status: 400 },
+      );
+    }
+
+    let builder = supabase.from("users").select(selectColumns);
+    if (resolvedWallet) {
+      builder = builder.eq("wallet_address", resolvedWallet);
+    } else if (resolvedEmail) {
+      builder = builder.eq("email", resolvedEmail);
+    }
+
+    const { data, error } = await builder.maybeSingle();
     if (error) {
       throw new Error(`Failed to fetch user: ${error.message}`);
     }
 
-    const user = data as {
-      email: string;
-      username: string | null;
-      first_name: string | null;
-      last_name: string | null;
-      location: string | null;
-      skills: string[] | null;
-      socials: string | null;
-      github: string | null;
-      display_name: string | null;
-      bio: string | null;
-      role: string | null;
-      updated_at: string | null;
-    } | null;
-
+    const user = data as ProfileRow | null;
     if (!user) {
       return jsonWithCors(req, { ok: false, error: "User not found" }, { status: 404 });
     }
 
     return jsonWithCors(req, {
       ok: true,
-      profile: {
-        email: user.email,
-        username: user.username ?? "",
-        firstName: user.first_name ?? "",
-        lastName: user.last_name ?? "",
-        location: user.location ?? "",
-        skills: user.skills ?? [],
-        socials: user.socials ?? "",
-        github: user.github ?? "",
-        displayName: user.display_name ?? "",
-        bio: user.bio ?? "",
-        role: user.role ?? "user",
-        updatedAt: user.updated_at,
-      },
+      profile: mapProfile(user),
     });
   } catch (error) {
     console.error(error);
@@ -150,52 +155,25 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const {
-      email,
-      displayName,
-      bio,
-      username,
-      firstName,
-      lastName,
-      location,
-      skills,
-      socials,
-      github,
-    } = parsed.data;
-
-    const sanitize = (value?: string) => {
-      if (value === undefined) return null;
-      const trimmed = value.trim();
-      return trimmed.length ? trimmed : null;
-    };
-
-    const sanitizedUsername = sanitize(username);
-    const sanitizedFirstName = sanitize(firstName);
-    const sanitizedLastName = sanitize(lastName);
-    const sanitizedLocation = sanitize(location);
-    const sanitizedSocials = sanitize(socials);
-    const sanitizedGithub = sanitize(github);
-    const sanitizedDisplayName = sanitize(displayName);
-    const sanitizedBio = sanitize(bio);
-
-    const normalizedSkills =
-      skills?.map(skill => skill.trim()).filter(skill => skill.length > 0) ?? [];
+    const { email, walletAddress, username, xpPoints } = parsed.data;
+    const sanitizedEmail = sanitizeEmail(email);
+    const sanitizedWalletAddress = walletAddress.trim();
+    const sanitizedUsername = sanitizeUsername(username);
 
     const supabase = getSupabaseClient();
-    
-    // Check if username is already taken by another user
+
     if (sanitizedUsername) {
       const { data: existingUser, error: lookupError } = await supabase
         .from("users")
         .select("email")
         .eq("username", sanitizedUsername)
-        .neq("email", email) // Exclude the current user
+        .neq("email", sanitizedEmail)
         .maybeSingle();
-      
+
       if (lookupError) {
         throw new Error(`Failed to check username availability: ${lookupError.message}`);
       }
-      
+
       if (existingUser) {
         return jsonWithCors(
           req,
@@ -204,64 +182,46 @@ export async function POST(req: NextRequest) {
         );
       }
     }
-    
+
+    const { data: walletOwner, error: walletLookupError } = await supabase
+      .from("users")
+      .select("email")
+      .eq("wallet_address", sanitizedWalletAddress)
+      .neq("email", sanitizedEmail)
+      .maybeSingle();
+
+    if (walletLookupError) {
+      throw new Error(`Failed to check wallet ownership: ${walletLookupError.message}`);
+    }
+
+    if (walletOwner) {
+      return jsonWithCors(
+        req,
+        { ok: false, error: { walletAddress: ["Wallet đã thuộc về user khác"] } },
+        { status: 400 },
+      );
+    }
+
     const payload = {
-      email,
+      email: sanitizedEmail,
+      wallet_address: sanitizedWalletAddress,
       username: sanitizedUsername,
-      first_name: sanitizedFirstName,
-      last_name: sanitizedLastName,
-      location: sanitizedLocation,
-      socials: sanitizedSocials,
-      github: sanitizedGithub,
-      display_name: sanitizedDisplayName,
-      bio: sanitizedBio,
-      skills: normalizedSkills,
-      updated_at: new Date().toISOString(),
+      ...(xpPoints !== undefined ? { xp_points: xpPoints } : {}),
     };
 
     const { data, error } = await supabase
       .from("users")
       .upsert(payload, { onConflict: "email" })
-      .select(
-        "email,username,first_name,last_name,location,skills,socials,github,display_name,bio,role,updated_at",
-      )
+      .select(selectColumns)
       .single();
 
     if (error) {
       throw new Error(`Failed to save profile: ${error.message}`);
     }
 
-    const profile = data as {
-      email: string;
-      username: string | null;
-      first_name: string | null;
-      last_name: string | null;
-      location: string | null;
-      skills: string[] | null;
-      socials: string | null;
-      github: string | null;
-      display_name: string | null;
-      bio: string | null;
-      role: string | null;
-      updated_at: string | null;
-    };
-
     return jsonWithCors(req, {
       ok: true,
-      profile: {
-        email: profile.email,
-        username: profile.username ?? "",
-        firstName: profile.first_name ?? "",
-        lastName: profile.last_name ?? "",
-        location: profile.location ?? "",
-        skills: profile.skills ?? [],
-        socials: profile.socials ?? "",
-        github: profile.github ?? "",
-        displayName: profile.display_name ?? "",
-        bio: profile.bio ?? "",
-        role: profile.role ?? "user",
-        updatedAt: profile.updated_at,
-      },
+      profile: mapProfile(data as ProfileRow),
     });
   } catch (error) {
     console.error(error);

@@ -4,10 +4,10 @@ import { getSupabaseClient } from "@/lib/supabase";
 import { getRequestSession, isAuthBypassEnabled } from "@/lib/auth";
 import { handleOptions, jsonWithCors } from "@/lib/cors";
 
-const roleEnum = z.enum(["user", "partner", "admin"]);
+const roleEnum = z.enum(["user", "organizer", "admin"]);
 
 const updateRoleSchema = z.object({
-  email: z.string().email(),
+  walletAddress: z.string().trim().min(1, "Wallet address không được bỏ trống"),
   role: roleEnum,
 });
 
@@ -36,16 +36,16 @@ export async function PATCH(req: NextRequest) {
 
     const { data: updated, error: updateError } = await supabase
       .from("users")
-      .update({ role: parsed.data.role, updated_at: new Date().toISOString() })
-      .eq("email", parsed.data.email)
-      .select("email, role, updated_at")
+      .update({ role: parsed.data.role })
+      .eq("wallet_address", parsed.data.walletAddress)
+      .select("wallet_address, role")
       .maybeSingle();
 
     if (updateError) {
       throw new Error(`Failed to update role: ${updateError.message}`);
     }
 
-    const updatedRecord = updated as { email: string; role: string | null; updated_at: string | null } | null;
+    const updatedRecord = updated as { wallet_address: string; role: string | null } | null;
 
     if (!updatedRecord) {
       return NextResponse.json({ ok: false, error: "User not found" }, { status: 404 });
@@ -54,9 +54,8 @@ export async function PATCH(req: NextRequest) {
     return jsonWithCors(req, {
       ok: true,
       user: {
-        email: updatedRecord.email,
+        walletAddress: updatedRecord.wallet_address,
         role: updatedRecord.role ?? "user",
-        updatedAt: updatedRecord.updated_at,
       },
     });
   } catch (error) {
