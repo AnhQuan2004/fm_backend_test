@@ -100,7 +100,7 @@ export async function GET(req: NextRequest) {
       return jsonWithCors(req, { ok: true, profiles });
     }
 
-    let resolvedWallet = walletAddress?.trim() ?? null;
+    const resolvedWallet = walletAddress?.trim() ?? null;
     let resolvedEmail = email ? sanitizeEmail(email) : null;
 
     if (!resolvedWallet && !resolvedEmail) {
