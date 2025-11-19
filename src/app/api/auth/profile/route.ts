@@ -12,14 +12,18 @@ const usernameSchema = z
   .regex(/^[a-zA-Z0-9._-]+$/, "Username chỉ được chứa chữ, số và ._-");
 
 const profileInputSchema = z.object({
-  email: z.string({ required_error: "Email không được bỏ trống" }).email("Email không hợp lệ"),
+  email: z
+    .string()
+    .trim()
+    .min(1, "Email không được bỏ trống")
+    .email("Email không hợp lệ"),
   walletAddress: z
-    .string({ required_error: "Wallet address không được bỏ trống" })
+    .string()
     .trim()
     .min(1, "Wallet address không được bỏ trống"),
   username: usernameSchema.optional(),
   xpPoints: z
-    .number({ invalid_type_error: "XP phải là số" })
+    .number()
     .int("XP phải là số nguyên")
     .min(0, "XP phải lớn hơn hoặc bằng 0")
     .optional(),
