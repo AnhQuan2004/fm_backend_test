@@ -21,6 +21,13 @@ type BountyRow = {
   creator_username: string | null;
   created_at: string;
   updated_at: string;
+  organizer_id: string | null;
+  slug: string | null;
+  xp_reward: number | null;
+  type: string | null;
+  complexity: string | null;
+  winners_count: number | null;
+  submission_template: string | null;
 };
 
 const updateSchema = z
@@ -34,6 +41,13 @@ const updateSchema = z
     status: statusEnum.optional(),
     creatorEmail: z.string().email("Email không hợp lệ").optional(),
     creatorUsername: z.string().optional(),
+    organizerId: z.string().uuid().optional(),
+    slug: z.string().trim().min(1, "Slug không được rỗng").optional(),
+    xpReward: z.number().int().min(0, "XP reward phải >= 0").optional(),
+    type: z.string().trim().min(1, "Type không được rỗng").optional(),
+    complexity: z.string().trim().min(1, "Complexity không được rỗng").optional(),
+    winnersCount: z.number().int().min(1, "Winners count phải >= 1").optional(),
+    submissionTemplate: z.string().trim().min(1, "Submission template không được rỗng").optional(),
   })
   .refine(data => Object.values(data).some(value => value !== undefined), {
     message: "Không có trường nào để cập nhật",
@@ -49,6 +63,13 @@ const putSchema = z.object({
   status: statusEnum,
   creatorEmail: z.string().email("Email không hợp lệ").optional(),
   creatorUsername: z.string().optional(),
+  organizerId: z.string().uuid().optional(),
+  slug: z.string().trim().min(1, "Slug không được rỗng").optional(),
+  xpReward: z.number().int().min(0, "XP reward phải >= 0").optional(),
+  type: z.string().trim().min(1, "Type không được rỗng").optional(),
+  complexity: z.string().trim().min(1, "Complexity không được rỗng").optional(),
+  winnersCount: z.number().int().min(1, "Winners count phải >= 1").optional(),
+  submissionTemplate: z.string().trim().min(1, "Submission template không được rỗng").optional(),
 });
 
 function mapBounty(row: BountyRow) {
@@ -64,10 +85,23 @@ function mapBounty(row: BountyRow) {
     createdBy: row.created_by,
     creatorEmail: row.creator_email,
     creatorUsername: row.creator_username,
+    organizerId: row.organizer_id,
+    slug: row.slug,
+    xpReward: row.xp_reward ?? 0,
+    type: row.type,
+    complexity: row.complexity,
+    winnersCount: row.winners_count ?? 1,
+    submissionTemplate: row.submission_template,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
 }
+
+const sanitizeOptional = (value?: string | null) => {
+  if (value === undefined || value === null) return undefined;
+  const trimmed = value.trim();
+  return trimmed.length ? trimmed : null;
+};
 
 async function getBountyOr404(id: string) {
   const supabase = getSupabaseClient();
@@ -144,6 +178,31 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (parsed.data.status !== undefined) updates.status = parsed.data.status;
     if (parsed.data.creatorEmail !== undefined) updates.creator_email = parsed.data.creatorEmail;
     if (parsed.data.creatorUsername !== undefined) updates.creator_username = parsed.data.creatorUsername;
+    if (parsed.data.organizerId !== undefined) updates.organizer_id = parsed.data.organizerId;
+
+    if (parsed.data.slug !== undefined) {
+      const sanitized = sanitizeOptional(parsed.data.slug);
+      updates.slug = sanitized ?? null;
+    }
+
+    if (parsed.data.xpReward !== undefined) updates.xp_reward = parsed.data.xpReward;
+
+    if (parsed.data.type !== undefined) {
+      const sanitized = sanitizeOptional(parsed.data.type);
+      updates.type = sanitized ?? null;
+    }
+
+    if (parsed.data.complexity !== undefined) {
+      const sanitized = sanitizeOptional(parsed.data.complexity);
+      updates.complexity = sanitized ?? null;
+    }
+
+    if (parsed.data.winnersCount !== undefined) updates.winners_count = parsed.data.winnersCount;
+
+    if (parsed.data.submissionTemplate !== undefined) {
+      const sanitized = sanitizeOptional(parsed.data.submissionTemplate);
+      updates.submission_template = sanitized ?? null;
+    }
 
     const supabase = getSupabaseClient();
     const { data, error } = await supabase
@@ -209,6 +268,38 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     
     if (parsed.data.creatorUsername !== undefined) {
       updates.creator_username = parsed.data.creatorUsername;
+    }
+
+    if (parsed.data.organizerId !== undefined) {
+      updates.organizer_id = parsed.data.organizerId;
+    }
+
+    if (parsed.data.slug !== undefined) {
+      const sanitized = sanitizeOptional(parsed.data.slug);
+      updates.slug = sanitized ?? null;
+    }
+
+    if (parsed.data.xpReward !== undefined) {
+      updates.xp_reward = parsed.data.xpReward;
+    }
+
+    if (parsed.data.type !== undefined) {
+      const sanitized = sanitizeOptional(parsed.data.type);
+      updates.type = sanitized ?? null;
+    }
+
+    if (parsed.data.complexity !== undefined) {
+      const sanitized = sanitizeOptional(parsed.data.complexity);
+      updates.complexity = sanitized ?? null;
+    }
+
+    if (parsed.data.winnersCount !== undefined) {
+      updates.winners_count = parsed.data.winnersCount;
+    }
+
+    if (parsed.data.submissionTemplate !== undefined) {
+      const sanitized = sanitizeOptional(parsed.data.submissionTemplate);
+      updates.submission_template = sanitized ?? null;
     }
 
     const supabase = getSupabaseClient();

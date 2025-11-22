@@ -12,6 +12,10 @@ const listQuerySchema = z.object({
   category: categoryEnum.optional(),
   createdBy: z.string().uuid().optional(),
   creatorUsername: z.string().optional(),
+  organizerId: z.string().uuid().optional(),
+  slug: z.string().optional(),
+  type: z.string().optional(),
+  complexity: z.string().optional(),
 });
 
 type BountyRow = {
@@ -28,6 +32,13 @@ type BountyRow = {
   creator_username: string | null;
   created_at: string;
   updated_at: string;
+  organizer_id: string | null;
+  slug: string | null;
+  xp_reward: number | null;
+  type: string | null;
+  complexity: string | null;
+  winners_count: number | null;
+  submission_template: string | null;
 };
 
 const createSchema = z.object({
@@ -41,6 +52,13 @@ const createSchema = z.object({
   createdBy: z.string().uuid().optional(),
   creatorEmail: z.string().email("Email không hợp lệ").optional(),
   creatorUsername: z.string().optional(),
+  organizerId: z.string().uuid().optional(),
+  slug: z.string().trim().min(1, "Slug không được rỗng").optional(),
+  xpReward: z.number().int().min(0, "XP reward phải >= 0").optional(),
+  type: z.string().trim().min(1, "Type không được rỗng").optional(),
+  complexity: z.string().trim().min(1, "Complexity không được rỗng").optional(),
+  winnersCount: z.number().int().min(1, "Winners count phải >= 1").optional(),
+  submissionTemplate: z.string().trim().min(1, "Submission template không được rỗng").optional(),
 });
 
 function mapBounty(row: BountyRow) {
@@ -56,6 +74,13 @@ function mapBounty(row: BountyRow) {
     createdBy: row.created_by,
     creatorEmail: row.creator_email,
     creatorUsername: row.creator_username,
+    organizerId: row.organizer_id,
+    slug: row.slug,
+    xpReward: row.xp_reward ?? 0,
+    type: row.type,
+    complexity: row.complexity,
+    winnersCount: row.winners_count ?? 1,
+    submissionTemplate: row.submission_template,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -73,6 +98,10 @@ export async function GET(req: NextRequest) {
       category: searchParams.get("category") ?? undefined,
       createdBy: searchParams.get("createdBy") ?? undefined,
       creatorUsername: searchParams.get("creatorUsername") ?? undefined,
+      organizerId: searchParams.get("organizerId") ?? undefined,
+      slug: searchParams.get("slug") ?? undefined,
+      type: searchParams.get("type") ?? undefined,
+      complexity: searchParams.get("complexity") ?? undefined,
     });
 
     if (!parsed.success) {
@@ -96,6 +125,22 @@ export async function GET(req: NextRequest) {
     
     if (parsed.data.creatorUsername) {
       query = query.eq("creator_username", parsed.data.creatorUsername);
+    }
+
+    if (parsed.data.organizerId) {
+      query = query.eq("organizer_id", parsed.data.organizerId);
+    }
+
+    if (parsed.data.slug) {
+      query = query.eq("slug", parsed.data.slug);
+    }
+
+    if (parsed.data.type) {
+      query = query.eq("type", parsed.data.type);
+    }
+
+    if (parsed.data.complexity) {
+      query = query.eq("complexity", parsed.data.complexity);
     }
 
     const { data, error } = await query;
@@ -174,7 +219,13 @@ export async function POST(req: NextRequest) {
     const supabase = getSupabaseClient();
     const deadlineISO = new Date(parsed.data.deadline).toISOString();
 
-    const insertPayload = {
+    const sanitizeOptional = (value?: string | null) => {
+      if (value === undefined || value === null) return null;
+      const trimmed = value.trim();
+      return trimmed.length ? trimmed : null;
+    };
+
+    const insertPayload: Record<string, unknown> = {
       title: parsed.data.title,
       description: parsed.data.description,
       category: parsed.data.category,
@@ -187,6 +238,33 @@ export async function POST(req: NextRequest) {
       creator_username: creatorUsername,
       updated_at: new Date().toISOString(),
     };
+
+    const sanitizedSlug = sanitizeOptional(parsed.data.slug);
+    const sanitizedType = sanitizeOptional(parsed.data.type);
+    const sanitizedComplexity = sanitizeOptional(parsed.data.complexity);
+    const sanitizedSubmissionTemplate = sanitizeOptional(parsed.data.submissionTemplate);
+
+    if (parsed.data.organizerId !== undefined) {
+      insertPayload.organizer_id = parsed.data.organizerId;
+    }
+    if (sanitizedSlug !== null) {
+      insertPayload.slug = sanitizedSlug;
+    }
+    if (parsed.data.xpReward !== undefined) {
+      insertPayload.xp_reward = parsed.data.xpReward;
+    }
+    if (sanitizedType !== null) {
+      insertPayload.type = sanitizedType;
+    }
+    if (sanitizedComplexity !== null) {
+      insertPayload.complexity = sanitizedComplexity;
+    }
+    if (parsed.data.winnersCount !== undefined) {
+      insertPayload.winners_count = parsed.data.winnersCount;
+    }
+    if (sanitizedSubmissionTemplate !== null) {
+      insertPayload.submission_template = sanitizedSubmissionTemplate;
+    }
 
     const { data, error } = await supabase
       .from("bounties")
