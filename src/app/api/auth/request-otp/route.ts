@@ -17,14 +17,16 @@ const bodySchema = z.object({
 export async function POST(req: NextRequest) {
   try {
     const json = await req.json();
-    const { email } = bodySchema.parse(json);
+    const parsed = bodySchema.parse(json);
+    const email = parsed.email.trim().toLowerCase();
+    const fallbackUsername = email.split("@")[0] || "";
 
     const supabase = getSupabaseClient();
 
     // Tìm hoặc tạo user theo email
     const { data: existingUser, error: fetchUserError } = await supabase
       .from("users")
-      .select("id")
+      .select("id,username")
       .eq("email", email)
       .maybeSingle();
     if (fetchUserError) {
@@ -35,13 +37,22 @@ export async function POST(req: NextRequest) {
     if (!userId) {
       const { data: createdUser, error: createUserError } = await supabase
         .from("users")
-        .insert({ email })
-        .select("id")
+        .insert({ email, username: fallbackUsername, role: "user", xp_points: 0 })
+        .select("id,username")
         .single();
       if (createUserError || !createdUser) {
         throw new Error(`Failed to create user: ${createUserError?.message ?? "unknown error"}`);
       }
       userId = createdUser.id as string;
+    } else if (!existingUser?.username && fallbackUsername) {
+      // Backfill username if missing
+      const { error: updateUsernameError } = await supabase
+        .from("users")
+        .update({ username: fallbackUsername })
+        .eq("id", userId);
+      if (updateUsernameError) {
+        console.error("Failed to backfill username on request-otp", updateUsernameError);
+      }
     }
 
     const OTP_TTL_SECONDS = safeNumberEnv("OTP_TTL_SECONDS", 300);

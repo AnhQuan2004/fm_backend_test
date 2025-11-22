@@ -43,8 +43,7 @@ async function verifyCore(
     try {
         const supabase = getSupabaseClient();
 
-        const selectColumns =
-            "id,email,username,first_name,last_name,location,skills,socials,github,display_name,bio,role,wallet_address,xp_points,created_at";
+        const selectColumns = "id,email,username,role,wallet_address,xp_points,created_at";
 
         const { data: userData, error: userError } = await supabase
             .from("users")
@@ -58,14 +57,6 @@ async function verifyCore(
             id: string;
             email: string;
             username: string | null;
-            first_name: string | null;
-            last_name: string | null;
-            location: string | null;
-            skills: string[] | null;
-            socials: string | null;
-            github: string | null;
-            display_name: string | null;
-            bio: string | null;
             role: string | null;
             wallet_address: string | null;
             xp_points: number | null;
@@ -184,14 +175,6 @@ async function verifyCore(
                 email: user.email,
                 userId: sessionData?.userId,
                 username: user.username ?? null,
-                firstName: user.first_name ?? null,
-                lastName: user.last_name ?? null,
-                location: user.location ?? null,
-                skills: user.skills ?? [],
-                socials: user.socials ?? null,
-                github: user.github ?? null,
-                displayName: user.display_name ?? null,
-                bio: user.bio ?? null,
                 role: user.role ?? "user",
                 walletAddress: user.wallet_address ?? null,
                 xpPoints: user.xp_points ?? 0,
