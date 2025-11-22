@@ -43,17 +43,18 @@ async function verifyCore(
     try {
         const supabase = getSupabaseClient();
 
+        const selectColumns =
+            "id,email,username,first_name,last_name,location,skills,socials,github,display_name,bio,role,wallet_address,xp_points,created_at";
+
         const { data: userData, error: userError } = await supabase
             .from("users")
-            .select(
-                "id,email,username,first_name,last_name,location,skills,socials,github,display_name,bio,role"
-            )
+            .select(selectColumns)
             .eq("email", data.email)
             .maybeSingle();
         if (userError) {
             throw new Error(`Failed to look up user: ${userError.message}`);
         }
-        const user = userData as {
+        let user = userData as {
             id: string;
             email: string;
             username: string | null;
@@ -66,9 +67,21 @@ async function verifyCore(
             display_name: string | null;
             bio: string | null;
             role: string | null;
+            wallet_address: string | null;
+            xp_points: number | null;
+            created_at: string | null;
         } | null;
+
         if (!user) {
-            return jsonWithCors(req, { ok: false, error: "Email không tồn tại" }, { status: 400 });
+            const { data: createdUser, error: createError } = await supabase
+                .from("users")
+                .insert({ email: data.email, role: "user", xp_points: 0 })
+                .select(selectColumns)
+                .single();
+            if (createError) {
+                throw new Error(`Failed to create user on verify: ${createError.message}`);
+            }
+            user = createdUser as typeof user;
         }
 
         const { data: tokenData, error: tokenError } = await supabase
@@ -178,6 +191,9 @@ async function verifyCore(
                 displayName: user.display_name ?? null,
                 bio: user.bio ?? null,
                 role: user.role ?? "user",
+                walletAddress: user.wallet_address ?? null,
+                xpPoints: user.xp_points ?? 0,
+                createdAt: user.created_at ?? null,
             },
         });
     } catch (e: unknown) {
