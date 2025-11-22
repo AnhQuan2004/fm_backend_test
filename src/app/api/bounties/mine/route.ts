@@ -7,7 +7,8 @@ const categoryEnum = z.enum(["dev", "content", "design", "research"]);
 const statusEnum = z.enum(["open", "in_review", "in-progress", "closed"]);
 
 const filterSchema = z.object({
-  createdBy: z.string().uuid({ message: "createdBy không hợp lệ" }),
+  createdBy: z.string().uuid({ message: "createdBy không hợp lệ" }).optional(),
+  createdEmail: z.string().email("Email không hợp lệ").optional(),
   status: statusEnum.optional(),
   category: categoryEnum.optional(),
 });
@@ -64,8 +65,16 @@ export async function OPTIONS(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
   try {
+    const createdByParam = req.nextUrl.searchParams.get("createdBy") ?? undefined;
+    const createdEmailParam =
+      req.nextUrl.searchParams.get("createdEmail") ??
+      req.nextUrl.searchParams.get("creatorEmail") ??
+      req.nextUrl.searchParams.get("email") ??
+      undefined;
+
     const parseFilters = filterSchema.safeParse({
-      createdBy: req.nextUrl.searchParams.get("createdBy") ?? undefined,
+      createdBy: createdByParam,
+      createdEmail: createdEmailParam,
       status: req.nextUrl.searchParams.get("status") ?? undefined,
       category: req.nextUrl.searchParams.get("category") ?? undefined,
     });
@@ -79,9 +88,20 @@ export async function GET(req: NextRequest) {
     }
 
     const ownerId = parseFilters.data.createdBy;
+    const ownerEmail = parseFilters.data.createdEmail?.toLowerCase();
+
+    if (!ownerId && !ownerEmail) {
+      return jsonWithCors(req, { ok: false, error: "Thiếu createdBy hoặc createdEmail" }, { status: 400 });
+    }
 
     const supabase = getSupabaseClient();
-    let query = supabase.from("bounties").select("*").eq("created_by", ownerId).order("created_at", { ascending: false });
+    let query = supabase.from("bounties").select("*").order("created_at", { ascending: false });
+
+    if (ownerId) {
+      query = query.eq("created_by", ownerId);
+    } else if (ownerEmail) {
+      query = query.eq("creator_email", ownerEmail);
+    }
 
     if (parseFilters.data.status) {
       query = query.eq("status", parseFilters.data.status);
