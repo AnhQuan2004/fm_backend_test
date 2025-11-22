@@ -126,32 +126,29 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const isUnderReview = bounty.status === "in_review";
     const isOwner = !!session && existing.user_id === session.userId;
 
-    if (!authBypass) {
-      if (isUnderReview) {
-        if (!isOrganizer) {
-          return jsonWithCors(req, { ok: false, error: "Forbidden" }, { status: 403 });
-        }
-      } else if (!isOwner && !isOrganizer) {
+  if (!authBypass) {
+    if (isUnderReview) {
+      if (!isOrganizer) {
         return jsonWithCors(req, { ok: false, error: "Forbidden" }, { status: 403 });
       }
+    } else if (!isOwner && !isOrganizer) {
+      return jsonWithCors(req, { ok: false, error: "Forbidden" }, { status: 403 });
     }
+  }
 
-    if (isUnderReview && parsed.data.submissionLink !== undefined && !authBypass && !isOrganizer) {
-      return jsonWithCors(
-        req,
-        { ok: false, error: "Bounty under review, không sửa submissionLink" },
-        { status: 403 },
-      );
-    }
+  if (isUnderReview && parsed.data.submissionLink !== undefined && !authBypass && !isOrganizer) {
+    return jsonWithCors(
+      req,
+      { ok: false, error: "Bounty under review, không sửa submissionLink" },
+      { status: 403 },
+    );
+  }
 
-    if (!authBypass && !isOrganizer) {
-      if (parsed.data.rank !== undefined) {
-        return jsonWithCors(req, { ok: false, error: "Only organizer có thể gán/bỏ rank" }, { status: 403 });
-      }
-      if (parsed.data.status !== undefined) {
-        return jsonWithCors(req, { ok: false, error: "Only organizer cập nhật status" }, { status: 403 });
-      }
+  if (!authBypass && !isOrganizer) {
+    if (parsed.data.status !== undefined) {
+      return jsonWithCors(req, { ok: false, error: "Only organizer cập nhật status" }, { status: 403 });
     }
+  }
 
     if (!authBypass && parsed.data.status === "submitted" && isUnderReview) {
       return jsonWithCors(req, { ok: false, error: "Under review, không revert về submitted" }, { status: 400 });
@@ -167,10 +164,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (parsed.data.status !== undefined) {
       updates.status = parsed.data.status;
     }
-    if (parsed.data.rank !== undefined) {
-      updates.rank = parsed.data.rank;
-    }
-
     const supabase = getSupabaseClient();
     const { data, error } = await supabase
       .from("submissions")
