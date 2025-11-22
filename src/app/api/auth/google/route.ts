@@ -7,6 +7,7 @@ import { cookies } from "next/headers";
 
 const bodySchema = z.object({
   email: z.string().email("Email không hợp lệ"),
+  username: z.string().trim().min(3).optional(),
   name: z.string().trim().optional(),
   sub: z.string().trim().optional(), // Google user id (optional, not stored)
   emailVerified: z.boolean().optional(),
@@ -32,7 +33,13 @@ export async function POST(req: NextRequest) {
 
     const email = parsed.data.email.toLowerCase();
     const supabase = getSupabaseClient();
-    const derivedUsername = email.split("@")[0] ?? null;
+    const sanitizeUsername = (value?: string | null) => {
+      if (!value) return null;
+      const trimmed = value.trim();
+      return trimmed.length >= 3 ? trimmed : null;
+    };
+    const derivedUsername =
+      sanitizeUsername(parsed.data.username) ?? sanitizeUsername(parsed.data.name) ?? sanitizeUsername(email.split("@")[0]);
 
     const { data: userData, error: userError } = await supabase
       .from("users")
