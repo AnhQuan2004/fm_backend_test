@@ -15,8 +15,6 @@ type SubmissionRow = {
   submission_link: string;
   notes: string | null;
   status: z.infer<typeof statusEnum>;
-  proof_links: string[] | null;
-  rank: number | null;
   created_at: string;
 };
 
@@ -25,8 +23,6 @@ const updateSchema = z
     submissionLink: z.string().trim().min(3, "submissionLink quá ngắn").optional(),
     notes: z.string().trim().optional(),
     status: statusEnum.optional(),
-    proofOfWork: z.array(z.string().trim().min(1)).max(10).optional(),
-    rank: z.union([z.number().int().min(1, "rank phải >= 1"), z.null()]).optional(),
   })
   .refine(data => Object.values(data).some(value => value !== undefined), {
     message: "Không có trường nào để cập nhật",
@@ -39,12 +35,6 @@ const sanitizeOptional = (value?: string | null) => {
   return trimmed.length ? trimmed : null;
 };
 
-const normalizeProof = (values?: string[]) => {
-  if (!values) return undefined;
-  const cleaned = values.map(item => item.trim()).filter(item => item.length > 0);
-  return cleaned.length ? cleaned : null;
-};
-
 const mapSubmission = (row: SubmissionRow) => ({
   id: row.id,
   bountyId: row.bounty_id,
@@ -54,8 +44,7 @@ const mapSubmission = (row: SubmissionRow) => ({
   submissionLink: row.submission_link,
   notes: row.notes,
   status: row.status,
-  proofOfWork: row.proof_links ?? [],
-  rank: row.rank,
+  proofOfWork: [],
   createdAt: row.created_at,
 });
 
@@ -177,9 +166,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
     if (parsed.data.status !== undefined) {
       updates.status = parsed.data.status;
-    }
-    if (parsed.data.proofOfWork !== undefined) {
-      updates.proof_links = normalizeProof(parsed.data.proofOfWork) ?? null;
     }
     if (parsed.data.rank !== undefined) {
       updates.rank = parsed.data.rank;

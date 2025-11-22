@@ -21,9 +21,7 @@ const createSchema = z.object({
   userEmail: z.string().email().optional(),
   submissionLink: z.string().trim().min(3, "submissionLink quá ngắn"),
   notes: z.string().trim().optional(),
-  proofOfWork: z.array(z.string().trim().min(1)).max(10).optional(),
   status: statusEnum.optional(),
-  rank: z.union([z.number().int().min(1, "rank phải >= 1"), z.null()]).optional(),
 });
 
 type SubmissionRow = {
@@ -35,8 +33,6 @@ type SubmissionRow = {
   submission_link: string;
   notes: string | null;
   status: z.infer<typeof statusEnum>;
-  proof_links: string[] | null;
-  rank: number | null;
   created_at: string;
 };
 
@@ -49,8 +45,7 @@ const mapSubmission = (row: SubmissionRow) => ({
   submissionLink: row.submission_link,
   notes: row.notes,
   status: row.status,
-  proofOfWork: row.proof_links ?? [],
-  rank: row.rank,
+  proofOfWork: [],
   createdAt: row.created_at,
 });
 
@@ -58,14 +53,6 @@ const sanitizeOptional = (value?: string | null) => {
   if (value === undefined || value === null) return null;
   const trimmed = value.trim();
   return trimmed.length ? trimmed : null;
-};
-
-const normalizeProof = (items?: string[]) => {
-  if (!items) return null;
-  const cleaned = items
-    .map(item => item.trim())
-    .filter(item => item.length > 0);
-  return cleaned.length ? cleaned : null;
 };
 
 export async function OPTIONS(req: NextRequest) {
@@ -179,8 +166,6 @@ export async function POST(req: NextRequest) {
 
     let username = sanitizeOptional(parsed.data.username);
     let userEmail = sanitizeOptional(parsed.data.userEmail);
-    const proofLinks = normalizeProof(parsed.data.proofOfWork);
-
     if (!username || !userEmail) {
       const { data: userRow, error: userError } = await supabase
         .from("users")
@@ -212,8 +197,6 @@ export async function POST(req: NextRequest) {
       submission_link: parsed.data.submissionLink.trim(),
       notes: sanitizeOptional(parsed.data.notes),
       status: parsed.data.status ?? "submitted",
-      proof_links: proofLinks,
-      rank: parsed.data.rank ?? null,
     };
 
     const { data, error } = await supabase
