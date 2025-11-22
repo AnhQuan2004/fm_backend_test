@@ -23,6 +23,7 @@ const createSchema = z.object({
   notes: z.string().trim().optional(),
   proofOfWork: z.array(z.string().trim().min(1)).max(10).optional(),
   status: statusEnum.optional(),
+  rank: z.union([z.number().int().min(1, "rank phải >= 1"), z.null()]).optional(),
 });
 
 type SubmissionRow = {
@@ -35,6 +36,7 @@ type SubmissionRow = {
   notes: string | null;
   status: z.infer<typeof statusEnum>;
   proof_links: string[] | null;
+  rank: number | null;
   created_at: string;
 };
 
@@ -48,6 +50,7 @@ const mapSubmission = (row: SubmissionRow) => ({
   notes: row.notes,
   status: row.status,
   proofOfWork: row.proof_links ?? [],
+  rank: row.rank,
   createdAt: row.created_at,
 });
 
@@ -152,6 +155,27 @@ export async function POST(req: NextRequest) {
     }
 
     const supabase = getSupabaseClient();
+    const { data: bountyRow, error: bountyError } = await supabase
+      .from("bounties")
+      .select("id,status,created_by")
+      .eq("id", parsed.data.bountyId)
+      .maybeSingle();
+
+    if (bountyError) {
+      throw new Error(`Failed to fetch bounty: ${bountyError.message}`);
+    }
+    if (!bountyRow) {
+      return jsonWithCors(req, { ok: false, error: "Bounty not found" }, { status: 404 });
+    }
+    const isUnderReview = bountyRow.status === "in_review";
+    const isClosed = bountyRow.status === "closed";
+    if (isUnderReview || isClosed) {
+      return jsonWithCors(
+        req,
+        { ok: false, error: "Bounty đang under review/đã đóng, không thể nộp bài" },
+        { status: 403 },
+      );
+    }
 
     let username = sanitizeOptional(parsed.data.username);
     let userEmail = sanitizeOptional(parsed.data.userEmail);
@@ -189,6 +213,7 @@ export async function POST(req: NextRequest) {
       notes: sanitizeOptional(parsed.data.notes),
       status: parsed.data.status ?? "submitted",
       proof_links: proofLinks,
+      rank: parsed.data.rank ?? null,
     };
 
     const { data, error } = await supabase

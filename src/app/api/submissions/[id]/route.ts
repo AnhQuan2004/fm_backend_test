@@ -16,6 +16,7 @@ type SubmissionRow = {
   notes: string | null;
   status: z.infer<typeof statusEnum>;
   proof_links: string[] | null;
+  rank: number | null;
   created_at: string;
 };
 
@@ -25,6 +26,7 @@ const updateSchema = z
     notes: z.string().trim().optional(),
     status: statusEnum.optional(),
     proofOfWork: z.array(z.string().trim().min(1)).max(10).optional(),
+    rank: z.union([z.number().int().min(1, "rank phải >= 1"), z.null()]).optional(),
   })
   .refine(data => Object.values(data).some(value => value !== undefined), {
     message: "Không có trường nào để cập nhật",
@@ -37,6 +39,12 @@ const sanitizeOptional = (value?: string | null) => {
   return trimmed.length ? trimmed : null;
 };
 
+const normalizeProof = (values?: string[]) => {
+  if (!values) return undefined;
+  const cleaned = values.map(item => item.trim()).filter(item => item.length > 0);
+  return cleaned.length ? cleaned : null;
+};
+
 const mapSubmission = (row: SubmissionRow) => ({
   id: row.id,
   bountyId: row.bounty_id,
@@ -47,6 +55,7 @@ const mapSubmission = (row: SubmissionRow) => ({
   notes: row.notes,
   status: row.status,
   proofOfWork: row.proof_links ?? [],
+  rank: row.rank,
   createdAt: row.created_at,
 });
 
@@ -56,10 +65,21 @@ async function getSubmissionOr404(id: string) {
   if (error) {
     throw new Error(`Failed to fetch submission: ${error.message}`);
   }
-  if (!data) {
-    return null;
-  }
+  if (!data) return null;
   return data as SubmissionRow;
+}
+
+async function getBountyForSubmission(bountyId: string) {
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase
+    .from("bounties")
+    .select("id,status,created_by")
+    .eq("id", bountyId)
+    .maybeSingle();
+  if (error) {
+    throw new Error(`Failed to fetch bounty for submission: ${error.message}`);
+  }
+  return data as { id: string; status: string; created_by: string } | null;
 }
 
 export async function OPTIONS(
@@ -77,7 +97,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     if (!submission) {
       return jsonWithCors(req, { ok: false, error: "Submission not found" }, { status: 404 });
     }
-
     return jsonWithCors(req, { ok: true, submission: mapSubmission(submission) });
   } catch (error) {
     console.error(error);
@@ -99,8 +118,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       return jsonWithCors(req, { ok: false, error: "Submission not found" }, { status: 404 });
     }
 
-    if (!authBypass && (!session || existing.user_id !== session.userId)) {
-      return jsonWithCors(req, { ok: false, error: "Forbidden" }, { status: 403 });
+    const bounty = await getBountyForSubmission(existing.bounty_id);
+    if (!bounty) {
+      return jsonWithCors(req, { ok: false, error: "Bounty not found" }, { status: 404 });
     }
 
     const json = await req.json();
@@ -111,6 +131,41 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         { ok: false, error: parsed.error.flatten().fieldErrors },
         { status: 400 },
       );
+    }
+
+    const isOrganizer = session?.userId === bounty.created_by;
+    const isUnderReview = bounty.status === "in_review";
+    const isOwner = !!session && existing.user_id === session.userId;
+
+    if (!authBypass) {
+      if (isUnderReview) {
+        if (!isOrganizer) {
+          return jsonWithCors(req, { ok: false, error: "Forbidden" }, { status: 403 });
+        }
+      } else if (!isOwner && !isOrganizer) {
+        return jsonWithCors(req, { ok: false, error: "Forbidden" }, { status: 403 });
+      }
+    }
+
+    if (isUnderReview && parsed.data.submissionLink !== undefined && !authBypass && !isOrganizer) {
+      return jsonWithCors(
+        req,
+        { ok: false, error: "Bounty under review, không sửa submissionLink" },
+        { status: 403 },
+      );
+    }
+
+    if (!authBypass && !isOrganizer) {
+      if (parsed.data.rank !== undefined) {
+        return jsonWithCors(req, { ok: false, error: "Only organizer có thể gán/bỏ rank" }, { status: 403 });
+      }
+      if (parsed.data.status !== undefined) {
+        return jsonWithCors(req, { ok: false, error: "Only organizer cập nhật status" }, { status: 403 });
+      }
+    }
+
+    if (!authBypass && parsed.data.status === "submitted" && isUnderReview) {
+      return jsonWithCors(req, { ok: false, error: "Under review, không revert về submitted" }, { status: 400 });
     }
 
     const updates: Record<string, unknown> = {};
@@ -124,11 +179,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       updates.status = parsed.data.status;
     }
     if (parsed.data.proofOfWork !== undefined) {
-      const cleaned =
-        parsed.data.proofOfWork
-          ?.map(item => item.trim())
-          .filter(item => item.length > 0) ?? [];
-      updates.proof_links = cleaned.length ? cleaned : null;
+      updates.proof_links = normalizeProof(parsed.data.proofOfWork) ?? null;
+    }
+    if (parsed.data.rank !== undefined) {
+      updates.rank = parsed.data.rank;
     }
 
     const supabase = getSupabaseClient();
@@ -164,8 +218,22 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
       return jsonWithCors(req, { ok: false, error: "Submission not found" }, { status: 404 });
     }
 
-    if (!authBypass && (!session || existing.user_id !== session.userId)) {
-      return jsonWithCors(req, { ok: false, error: "Forbidden" }, { status: 403 });
+    const bounty = await getBountyForSubmission(existing.bounty_id);
+    if (!bounty) {
+      return jsonWithCors(req, { ok: false, error: "Bounty not found" }, { status: 404 });
+    }
+
+    const isOrganizer = session?.userId === bounty.created_by;
+    const isUnderReview = bounty.status === "in_review";
+    const isOwner = !!session && existing.user_id === session.userId;
+
+    if (!authBypass) {
+      if (isUnderReview && !isOrganizer) {
+        return jsonWithCors(req, { ok: false, error: "Forbidden" }, { status: 403 });
+      }
+      if (!isOwner && !isOrganizer) {
+        return jsonWithCors(req, { ok: false, error: "Forbidden" }, { status: 403 });
+      }
     }
 
     const supabase = getSupabaseClient();
