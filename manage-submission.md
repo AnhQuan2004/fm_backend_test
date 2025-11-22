@@ -2,16 +2,6 @@
 
 Guide for organizers reviewing and ranking submissions of a bounty.
 
-## Table Fields (review-related)
-
-| Column           | Notes                                        |
-| ---------------- | -------------------------------------------- |
-| `status`         | `submitted` \| `rejected` \| `selected`      |
-| `rank`           | Integer prize rank; organizer assigns        |
-| `proof_links`    | Optional proof-of-work links (text[])        |
-| `notes`          | Organizer/user notes                         |
-
-## Key Rules
 
 - When bounty status is `in_review`, users cannot submit new work; only organizer (or bypass) may update/delete submissions.
 - Organizer-only actions:
