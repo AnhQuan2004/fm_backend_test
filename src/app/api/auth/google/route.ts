@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
       throw new Error(`Failed to look up user: ${userError.message}`);
     }
 
-    let user = userData as {
+    type UserRecord = {
       id: string;
       email: string;
       username: string | null;
@@ -51,7 +51,9 @@ export async function POST(req: NextRequest) {
       wallet_address: string | null;
       xp_points: number | null;
       created_at: string | null;
-    } | null;
+    };
+
+    let user: UserRecord | null = (userData as UserRecord | null) ?? null;
 
     if (!user) {
       const { data: createdUser, error: createError } = await supabase
@@ -62,7 +64,7 @@ export async function POST(req: NextRequest) {
       if (createError) {
         throw new Error(`Failed to create user from Google login: ${createError.message}`);
       }
-      user = createdUser as typeof user;
+      user = createdUser as UserRecord;
     }
 
     const token = signSession({ userId: user!.id, email: user!.email });

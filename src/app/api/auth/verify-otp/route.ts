@@ -54,7 +54,7 @@ async function verifyCore(
         if (userError) {
             throw new Error(`Failed to look up user: ${userError.message}`);
         }
-        let user = userData as {
+        type UserRecord = {
             id: string;
             email: string;
             username: string | null;
@@ -70,7 +70,9 @@ async function verifyCore(
             wallet_address: string | null;
             xp_points: number | null;
             created_at: string | null;
-        } | null;
+        };
+
+        let user: UserRecord | null = (userData as UserRecord | null) ?? null;
 
         if (!user) {
             const { data: createdUser, error: createError } = await supabase
@@ -81,7 +83,7 @@ async function verifyCore(
             if (createError) {
                 throw new Error(`Failed to create user on verify: ${createError.message}`);
             }
-            user = createdUser as typeof user;
+            user = createdUser as UserRecord;
         }
 
         const { data: tokenData, error: tokenError } = await supabase
