@@ -32,6 +32,7 @@ export async function POST(req: NextRequest) {
 
     const email = parsed.data.email.toLowerCase();
     const supabase = getSupabaseClient();
+    const derivedUsername = email.split("@")[0] ?? null;
 
     const { data: userData, error: userError } = await supabase
       .from("users")
@@ -58,7 +59,7 @@ export async function POST(req: NextRequest) {
     if (!user) {
       const { data: createdUser, error: createError } = await supabase
         .from("users")
-        .insert({ email, role: "user", xp_points: 0 })
+        .insert({ email, role: "user", xp_points: 0, username: derivedUsername })
         .select(selectColumns)
         .single();
       if (createError) {
