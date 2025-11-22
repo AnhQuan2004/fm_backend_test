@@ -15,7 +15,7 @@ type SubmissionRow = {
   submission_link: string;
   notes: string | null;
   status: z.infer<typeof statusEnum>;
-  rank: number | null;
+  proof_links: string[] | null;
   created_at: string;
 };
 
@@ -24,7 +24,7 @@ const updateSchema = z
     submissionLink: z.string().trim().min(3, "submissionLink quá ngắn").optional(),
     notes: z.string().trim().optional(),
     status: statusEnum.optional(),
-    rank: z.union([z.number().int().min(1, "rank phải >= 1"), z.null()]).optional(),
+    proofOfWork: z.array(z.string().trim().min(1)).max(10).optional(),
   })
   .refine(data => Object.values(data).some(value => value !== undefined), {
     message: "Không có trường nào để cập nhật",
@@ -46,7 +46,7 @@ const mapSubmission = (row: SubmissionRow) => ({
   submissionLink: row.submission_link,
   notes: row.notes,
   status: row.status,
-  rank: row.rank,
+  proofOfWork: row.proof_links ?? [],
   createdAt: row.created_at,
 });
 
@@ -123,8 +123,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (parsed.data.status !== undefined) {
       updates.status = parsed.data.status;
     }
-    if (parsed.data.rank !== undefined) {
-      updates.rank = parsed.data.rank;
+    if (parsed.data.proofOfWork !== undefined) {
+      const cleaned =
+        parsed.data.proofOfWork
+          ?.map(item => item.trim())
+          .filter(item => item.length > 0) ?? [];
+      updates.proof_links = cleaned.length ? cleaned : null;
     }
 
     const supabase = getSupabaseClient();

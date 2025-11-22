@@ -14,7 +14,7 @@ Manage bounty submissions backed by the `submissions` table.
 | `submission_link`| text      | Required                                         |
 | `notes`          | text      | Optional                                         |
 | `status`         | text      | `submitted`, `rejected`, `selected` (default `submitted`) |
-| `rank`           | integer   | Optional; 1 = first prize, etc.; NULL = none     |
+| `proof_links`    | text[]    | Optional proof-of-work links (screenshots, docs) |
 | `created_at`     | timestamptz | Auto timestamp                                |
 
 ## Endpoints
@@ -64,8 +64,8 @@ Body schema:
 | `userEmail`      | string  | No       | Trimmed; auto-fetched if missing           |
 | `submissionLink` | string  | Yes      | ≥ 3 chars                                  |
 | `notes`          | string  | No       | Optional                                   |
+| `proofOfWork`    | string[]| No       | Array of URLs/links, max 10, trimmed       |
 | `status`         | enum    | No       | Defaults to `submitted`                    |
-| `rank`           | int     | No       | ≥ 1; omit/null when no prize               |
 
 Example:
 
@@ -79,8 +79,8 @@ curl -X POST "http://localhost:3000/api/submissions" \
         "userEmail": "user@example.com",
         "submissionLink": "https://github.com/org/repo",
         "notes": "Demo video in README",
-        "status": "submitted",
-        "rank": 1
+        "proofOfWork": ["https://i.imgur.com/screenshot.png"],
+        "status": "submitted"
       }'
 ```
 
@@ -96,14 +96,14 @@ curl "http://localhost:3000/api/submissions/<id>" -H "Accept: application/json"
 
 ### PATCH `/api/submissions/:id`
 
-Partial update (must include at least one field): `submissionLink`, `notes`, `status`, `rank` (int ≥ 1 or null).
+Partial update (must include at least one field): `submissionLink`, `notes`, `status`, `proofOfWork` (array of links).
 
 Example:
 
 ```bash
 curl -X PATCH "http://localhost:3000/api/submissions/<id>" \
   -H "Content-Type: application/json" \
-  -d '{ "status": "selected", "rank": 1, "notes": "Great work" }'
+  -d '{ "status": "selected", "notes": "Great work", "proofOfWork": ["https://i.imgur.com/new-proof.png"] }'
 ```
 
 ### DELETE `/api/submissions/:id`
