@@ -44,10 +44,10 @@ export async function OPTIONS(req: NextRequest) {
 
 export async function GET(
   req: NextRequest,
-  context: { params: Promise<{ slug?: string }> | { slug?: string } },
+  { params }: { params: Promise<{ slug?: string }> },
 ) {
   try {
-    const resolvedParams = "then" in context.params ? await context.params : context.params;
+    const resolvedParams = await params;
     const slug =
       resolvedParams.slug?.trim() ??
       req.nextUrl.searchParams.get("username")?.trim() ??
