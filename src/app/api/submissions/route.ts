@@ -32,6 +32,7 @@ type SubmissionRow = {
   user_email: string | null;
   submission_link: string;
   notes: string | null;
+  rank: number | null;
   status: z.infer<typeof statusEnum>;
   created_at: string;
 };
@@ -45,6 +46,7 @@ const mapSubmission = (row: SubmissionRow) => ({
   submissionLink: row.submission_link,
   notes: row.notes,
   status: row.status,
+  rank: row.rank,
   proofOfWork: [],
   createdAt: row.created_at,
 });
