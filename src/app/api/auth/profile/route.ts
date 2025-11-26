@@ -27,6 +27,12 @@ const profileInputSchema = z.object({
     .int("XP phải là số nguyên")
     .min(0, "XP phải lớn hơn hoặc bằng 0")
     .optional(),
+  github: z
+    .string()
+    .trim()
+    .min(1)
+    .max(100)
+    .optional(),
 });
 
 const profileQuerySchema = z.object({
@@ -38,7 +44,8 @@ const profileQuerySchema = z.object({
     .optional(),
 });
 
-const selectColumns = "id,email,wallet_address,username,role,xp_points,created_at";
+const selectColumns =
+  "id,email,wallet_address,username,role,xp_points,github,created_at";
 
 type ProfileRow = {
   id: string;
@@ -47,6 +54,7 @@ type ProfileRow = {
   username: string | null;
   role: string | null;
   xp_points: number | null;
+  github: string | null;
   created_at: string | null;
 };
 
@@ -57,6 +65,7 @@ const mapProfile = (row: ProfileRow) => ({
   username: row.username ?? "",
   xpPoints: row.xp_points ?? 0,
   role: row.role ?? "user",
+  githubUsername: row.github ?? null,
   createdAt: row.created_at,
 });
 
@@ -67,6 +76,11 @@ const sanitizeUsername = (value?: string | null) => {
 };
 
 const sanitizeEmail = (value: string) => value.trim().toLowerCase();
+const sanitizeGithubUsername = (value?: string | null) => {
+  if (value === undefined || value === null) return null;
+  const trimmed = value.trim();
+  return trimmed.length ? trimmed : null;
+};
 
 export async function OPTIONS(req: NextRequest) {
   return handleOptions(req);
@@ -159,7 +173,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { email, walletAddress, username, xpPoints } = parsed.data;
+    const { email, walletAddress, username, xpPoints, github } = parsed.data;
     const sanitizedEmail = sanitizeEmail(email);
     const sanitizedWalletAddress = walletAddress.trim();
     const sanitizedUsername = sanitizeUsername(username);
@@ -211,6 +225,7 @@ export async function POST(req: NextRequest) {
       wallet_address: sanitizedWalletAddress,
       username: sanitizedUsername,
       ...(xpPoints !== undefined ? { xp_points: xpPoints } : {}),
+      ...(sanitizeGithubUsername(github) ? { github: sanitizeGithubUsername(github) } : {}),
     };
 
     const { data, error } = await supabase
