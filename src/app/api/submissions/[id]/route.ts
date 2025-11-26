@@ -14,6 +14,7 @@ type SubmissionRow = {
   user_email: string | null;
   submission_link: string;
   notes: string | null;
+  rank: number | null;
   status: z.infer<typeof statusEnum>;
   created_at: string;
 };
@@ -23,6 +24,7 @@ const updateSchema = z
     submissionLink: z.string().trim().min(3, "submissionLink quá ngắn").optional(),
     notes: z.string().trim().optional(),
     status: statusEnum.optional(),
+    rank: z.number().int().min(1).nullable().optional(),
   })
   .refine(data => Object.values(data).some(value => value !== undefined), {
     message: "Không có trường nào để cập nhật",
@@ -43,6 +45,7 @@ const mapSubmission = (row: SubmissionRow) => ({
   userEmail: row.user_email,
   submissionLink: row.submission_link,
   notes: row.notes,
+  rank: row.rank,
   status: row.status,
   proofOfWork: [],
   createdAt: row.created_at,
@@ -126,29 +129,32 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const isUnderReview = bounty.status === "in_review";
     const isOwner = !!session && existing.user_id === session.userId;
 
-  if (!authBypass) {
-    if (isUnderReview) {
-      if (!isOrganizer) {
+    if (!authBypass) {
+      if (isUnderReview) {
+        if (!isOrganizer) {
+          return jsonWithCors(req, { ok: false, error: "Forbidden" }, { status: 403 });
+        }
+      } else if (!isOwner && !isOrganizer) {
         return jsonWithCors(req, { ok: false, error: "Forbidden" }, { status: 403 });
       }
-    } else if (!isOwner && !isOrganizer) {
-      return jsonWithCors(req, { ok: false, error: "Forbidden" }, { status: 403 });
     }
-  }
 
-  if (isUnderReview && parsed.data.submissionLink !== undefined && !authBypass && !isOrganizer) {
-    return jsonWithCors(
-      req,
-      { ok: false, error: "Bounty under review, không sửa submissionLink" },
-      { status: 403 },
-    );
-  }
-
-  if (!authBypass && !isOrganizer) {
-    if (parsed.data.status !== undefined) {
-      return jsonWithCors(req, { ok: false, error: "Only organizer cập nhật status" }, { status: 403 });
+    if (isUnderReview && parsed.data.submissionLink !== undefined && !authBypass && !isOrganizer) {
+      return jsonWithCors(
+        req,
+        { ok: false, error: "Bounty under review, không sửa submissionLink" },
+        { status: 403 },
+      );
     }
-  }
+
+    if (!authBypass && !isOrganizer) {
+      if (parsed.data.status !== undefined) {
+        return jsonWithCors(req, { ok: false, error: "Only organizer cập nhật status" }, { status: 403 });
+      }
+      if (parsed.data.rank !== undefined) {
+        return jsonWithCors(req, { ok: false, error: "Only organizer cập nhật rank" }, { status: 403 });
+      }
+    }
 
     if (!authBypass && parsed.data.status === "submitted" && isUnderReview) {
       return jsonWithCors(req, { ok: false, error: "Under review, không revert về submitted" }, { status: 400 });
@@ -163,6 +169,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
     if (parsed.data.status !== undefined) {
       updates.status = parsed.data.status;
+    }
+    if (parsed.data.rank !== undefined) {
+      updates.rank = parsed.data.rank;
     }
     const supabase = getSupabaseClient();
     const { data, error } = await supabase
