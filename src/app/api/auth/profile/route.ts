@@ -20,7 +20,8 @@ const profileInputSchema = z.object({
   walletAddress: z
     .string()
     .trim()
-    .min(1, "Wallet address không được bỏ trống"),
+    .optional()
+    .transform(val => val === "" ? undefined : val),
   username: usernameSchema.optional(),
   xpPoints: z
     .number()
@@ -192,10 +193,24 @@ export async function POST(req: NextRequest) {
 
     const { email, walletAddress, username, xpPoints, github } = parsed.data;
     const sanitizedEmail = sanitizeEmail(email);
-    const sanitizedWalletAddress = walletAddress.trim();
+    const sanitizedWalletAddress = walletAddress?.trim() || "";
     const sanitizedUsername = sanitizeUsername(username);
 
     const supabase = getSupabaseClient();
+
+    // Get current profile to preserve wallet if not provided
+    let finalWalletAddress = sanitizedWalletAddress;
+    if (!finalWalletAddress) {
+      const { data: currentProfile } = await supabase
+        .from("users")
+        .select("wallet_address")
+        .eq("email", sanitizedEmail)
+        .maybeSingle();
+      
+      if (currentProfile?.wallet_address) {
+        finalWalletAddress = currentProfile.wallet_address;
+      }
+    }
 
     if (sanitizedUsername) {
       const { data: existingUser, error: lookupError } = await supabase
@@ -218,28 +233,31 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const { data: walletOwner, error: walletLookupError } = await supabase
-      .from("users")
-      .select("email")
-      .eq("wallet_address", sanitizedWalletAddress)
-      .neq("email", sanitizedEmail)
-      .maybeSingle();
+    // Only check wallet ownership if walletAddress is provided and not empty
+    if (finalWalletAddress) {
+      const { data: walletOwner, error: walletLookupError } = await supabase
+        .from("users")
+        .select("email")
+        .eq("wallet_address", finalWalletAddress)
+        .neq("email", sanitizedEmail)
+        .maybeSingle();
 
-    if (walletLookupError) {
-      throw new Error(`Failed to check wallet ownership: ${walletLookupError.message}`);
+      if (walletLookupError) {
+        throw new Error(`Failed to check wallet ownership: ${walletLookupError.message}`);
+      }
+
+      if (walletOwner) {
+        return jsonWithCors(
+          req,
+          { ok: false, error: { walletAddress: ["Wallet đã thuộc về user khác"] } },
+          { status: 400 },
+        );
+      }
     }
 
-    if (walletOwner) {
-      return jsonWithCors(
-        req,
-        { ok: false, error: { walletAddress: ["Wallet đã thuộc về user khác"] } },
-        { status: 400 },
-      );
-    }
-
-    const payload = {
+    const payload: Record<string, unknown> = {
       email: sanitizedEmail,
-      wallet_address: sanitizedWalletAddress,
+      wallet_address: finalWalletAddress || "", // Always include, can be empty string
       username: sanitizedUsername,
       ...(xpPoints !== undefined ? { xp_points: xpPoints } : {}),
       ...(sanitizeGithubUsername(github) ? { github: sanitizeGithubUsername(github) } : {}),

@@ -27,8 +27,8 @@ const getAllowedOrigins = (): string[] => {
 
   // Parse comma-separated origins from env
   const origins = envOrigins
-    .split(",")
-    .map(origin => origin.trim())
+        .split(",")
+        .map(origin => origin.trim())
     .filter(Boolean);
 
   return origins;
@@ -48,7 +48,7 @@ function resolveOrigin(requestOrigin: string | null): string | null {
   if (!requestOrigin) {
     return null;
   }
-
+  
   // Always allow localhost in development (for local testing)
   if (isDevelopment && (
     requestOrigin.startsWith("http://localhost:") ||
@@ -73,7 +73,7 @@ function resolveOrigin(requestOrigin: string | null): string | null {
   if (allowedOrigins.includes(requestOrigin)) {
     return requestOrigin;
   }
-
+  
   // Origin not allowed
   console.warn(`🚫 CORS blocked: ${requestOrigin} - not in allowed origins: ${allowedOrigins.join(", ")}`);
   return null;
