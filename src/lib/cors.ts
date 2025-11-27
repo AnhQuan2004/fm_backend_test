@@ -9,16 +9,33 @@ const DEFAULT_HEADERS = [
   "Origin",
 ];
 
-// Always allow all origins in development and add specific production origins
-const allowedOrigins = process.env.NODE_ENV === "production"
-  ? [
-      "https://fm-pied.vercel.app",
-      ...(process.env.CORS_ALLOWED_ORIGINS ?? "")
-        .split(",")
-        .map(origin => origin.trim())
-        .filter(Boolean)
-    ]
-  : ["*"];
+// Read allowed origins from environment variables
+// Format: CORS_ALLOWED_ORIGINS=http://localhost:8080,https://your-fe-domain.com
+// Separate multiple origins with commas
+const getAllowedOrigins = (): string[] => {
+  const envOrigins = process.env.CORS_ALLOWED_ORIGINS;
+  
+  if (!envOrigins) {
+    // If no env is set, allow localhost in development, deny all in production
+    if (process.env.NODE_ENV === "production") {
+      console.warn("⚠️  CORS_ALLOWED_ORIGINS not set in production! All requests will be blocked.");
+      return [];
+    }
+    // Development: allow localhost
+    return ["*"];
+  }
+
+  // Parse comma-separated origins from env
+  const origins = envOrigins
+    .split(",")
+    .map(origin => origin.trim())
+    .filter(Boolean);
+
+  return origins;
+};
+
+const allowedOrigins = getAllowedOrigins();
+const isDevelopment = process.env.NODE_ENV !== "production";
 
 type CorsOptions = {
   allowMethods?: string[];
@@ -27,21 +44,39 @@ type CorsOptions = {
   maxAge?: number;
 };
 
-function resolveOrigin(requestOrigin: string | null) {
-  // In development or when wildcard is allowed, accept any origin
-  if (allowedOrigins.includes("*")) {
-    return requestOrigin ?? "*";
-  }
-  
+function resolveOrigin(requestOrigin: string | null): string | null {
   if (!requestOrigin) {
     return null;
   }
-  
-  if (allowedOrigins.length === 0) {
+
+  // Always allow localhost in development (for local testing)
+  if (isDevelopment && (
+    requestOrigin.startsWith("http://localhost:") ||
+    requestOrigin.startsWith("http://127.0.0.1:") ||
+    requestOrigin.startsWith("https://localhost:")
+  )) {
     return requestOrigin;
   }
-  
-  return allowedOrigins.includes(requestOrigin) ? requestOrigin : null;
+
+  // If wildcard is allowed (development mode), accept any origin
+  if (allowedOrigins.includes("*")) {
+    return requestOrigin;
+  }
+
+  // Check if origin is in allowed list
+  if (allowedOrigins.length === 0) {
+    // No origins configured - deny all (except localhost in dev which is handled above)
+    console.warn(`🚫 CORS blocked: ${requestOrigin} - not in allowed origins`);
+    return null;
+  }
+
+  if (allowedOrigins.includes(requestOrigin)) {
+    return requestOrigin;
+  }
+
+  // Origin not allowed
+  console.warn(`🚫 CORS blocked: ${requestOrigin} - not in allowed origins: ${allowedOrigins.join(", ")}`);
+  return null;
 }
 
 export function withCors(

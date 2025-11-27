@@ -103,6 +103,7 @@ export async function GET(req: NextRequest) {
     }
 
     const { walletAddress, email, all } = parseResult.data;
+    console.log("📋 Profile GET Request:", { walletAddress, email, all });
     const supabase = getSupabaseClient();
 
     if (all) {
@@ -115,6 +116,7 @@ export async function GET(req: NextRequest) {
       }
 
       const profiles = (data as ProfileRow[]).map(mapProfile);
+      console.log("📋 All Profiles:", { count: profiles.length, profiles });
       return jsonWithCors(req, { ok: true, profiles });
     }
 
@@ -124,6 +126,7 @@ export async function GET(req: NextRequest) {
     if (!resolvedWallet && !resolvedEmail) {
       const session = await getRequestSession();
       resolvedEmail = session?.email ? sanitizeEmail(session.email) : null;
+      console.log("📋 Using session email:", resolvedEmail);
     }
 
     if (!resolvedWallet && !resolvedEmail) {
@@ -134,6 +137,7 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    console.log("📋 Querying profile with:", { resolvedWallet, resolvedEmail });
     let builder = supabase.from("users").select(selectColumns);
     if (resolvedWallet) {
       builder = builder.eq("wallet_address", resolvedWallet);
@@ -148,12 +152,25 @@ export async function GET(req: NextRequest) {
 
     const user = data as ProfileRow | null;
     if (!user) {
+      console.log("📋 Profile not found for:", { resolvedWallet, resolvedEmail });
       return jsonWithCors(req, { ok: false, error: "User not found" }, { status: 404 });
     }
 
+    const profile = mapProfile(user);
+    console.log("📋 Profile found:", {
+      id: profile.id,
+      email: profile.email,
+      username: profile.username,
+      walletAddress: profile.walletAddress,
+      githubUsername: profile.githubUsername,
+      xpPoints: profile.xpPoints,
+      role: profile.role,
+      createdAt: profile.createdAt,
+    });
+
     return jsonWithCors(req, {
       ok: true,
-      profile: mapProfile(user),
+      profile,
     });
   } catch (error) {
     console.error(error);
@@ -238,9 +255,20 @@ export async function POST(req: NextRequest) {
       throw new Error(`Failed to save profile: ${error.message}`);
     }
 
+    const savedProfile = mapProfile(data as ProfileRow);
+    console.log("📋 Profile saved/updated:", {
+      id: savedProfile.id,
+      email: savedProfile.email,
+      username: savedProfile.username,
+      walletAddress: savedProfile.walletAddress,
+      githubUsername: savedProfile.githubUsername,
+      xpPoints: savedProfile.xpPoints,
+      role: savedProfile.role,
+    });
+
     return jsonWithCors(req, {
       ok: true,
-      profile: mapProfile(data as ProfileRow),
+      profile: savedProfile,
     });
   } catch (error) {
     console.error(error);

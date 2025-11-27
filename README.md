@@ -21,7 +21,7 @@ npm run dev
 
 ### Environment Variables
 
-```
+```bash
 # Supabase
 SUPABASE_URL=https://<project-ref>.supabase.co
 SUPABASE_ANON_KEY=your-anon-key
@@ -29,7 +29,7 @@ SUPABASE_ANON_KEY=your-anon-key
 # SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 
 # JWT
-JWT_SECRET=replace-me
+JWT_SECRET=replace-me-with-random-string
 
 # OTP
 OTP_TTL_SECONDS=300
@@ -41,7 +41,24 @@ SMTP_PORT=587
 SMTP_USER=you@example.com
 SMTP_PASS=your-app-password
 SMTP_FROM=you@example.com
+
+# GitHub OAuth
+GITHUB_CLIENT_ID=your-github-client-id
+GITHUB_CLIENT_SECRET=your-github-client-secret
+
+# CORS Configuration (REQUIRED for production)
+# Comma-separated list of allowed frontend origins
+# Example: http://localhost:8080,https://your-fe-domain.com
+# IMPORTANT: In production, set this to your actual frontend domain(s) only!
+# If not set in production, all requests will be blocked for security.
+CORS_ALLOWED_ORIGINS=http://localhost:8080,https://your-production-fe-domain.com
 ```
+
+**CORS Security Note:** 
+- In development, localhost is automatically allowed
+- In production, you MUST set `CORS_ALLOWED_ORIGINS` to your frontend domain(s)
+- Only origins listed in `CORS_ALLOWED_ORIGINS` will be allowed to access the API
+- Separate multiple origins with commas (no spaces)
 
 Restart the dev server whenever you change `.env`.
 
