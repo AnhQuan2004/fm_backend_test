@@ -45,7 +45,7 @@ const createSchema = z.object({
   title: z.string().trim().min(3, "Title phải có ít nhất 3 ký tự"),
   description: z.string().trim().min(10, "Description quá ngắn"),
   category: categoryEnum,
-  rewardAmount: z.number().positive("Reward amount phải > 0"),
+  rewardAmount: z.number().min(0, "Reward amount phải >= 0"),
   rewardToken: z.string().trim().min(1, "Reward token không được rỗng"),
   deadline: z.string().datetime(),
   status: statusEnum.optional(),
