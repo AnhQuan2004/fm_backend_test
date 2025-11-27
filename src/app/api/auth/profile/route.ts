@@ -257,11 +257,16 @@ export async function POST(req: NextRequest) {
 
     const payload: Record<string, unknown> = {
       email: sanitizedEmail,
-      wallet_address: finalWalletAddress || "", // Always include, can be empty string
       username: sanitizedUsername,
       ...(xpPoints !== undefined ? { xp_points: xpPoints } : {}),
       ...(sanitizeGithubUsername(github) ? { github: sanitizeGithubUsername(github) } : {}),
     };
+
+    // Only include wallet_address if we have a non-empty value
+    // This prevents unique constraint violation when multiple users have empty wallet
+    if (finalWalletAddress) {
+      payload.wallet_address = finalWalletAddress;
+    }
 
     const { data, error } = await supabase
       .from("users")

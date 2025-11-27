@@ -165,13 +165,13 @@ export async function POST(req: NextRequest) {
       }
     } else {
       // Create new user
-      // For new users, we need a wallet address - we'll use a placeholder or require it
-      // For now, we'll create user without wallet (they can add it later)
+      // Don't set wallet_address if empty to avoid unique constraint violation
+      // User can add wallet later
       const { data: newUser, error: createError } = await supabase
         .from("users")
         .insert({
           email: userEmail,
-          wallet_address: "", // Empty, user can add later
+          // wallet_address: not included, will be NULL in database
           github: githubUsername,
           username: githubUsername, // Use GitHub username as default
         })
